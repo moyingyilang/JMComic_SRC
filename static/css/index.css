@@ -1,0 +1,87 @@
+/* 1. 引入 Tailwind 的基础样式 */
+@tailwind base;
+
+/* 2. 引入 Tailwind 的组件样式 */
+@tailwind components;
+
+/* 3. 引入 Tailwind 的工具类 */
+@tailwind utilities;
+
+:root {
+  box-sizing: border-box;
+  background: #ededed;
+  font-size: 0.8rem;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* 隱藏滾動條 */
+}
+
+.scrollbar-hidden {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+body {
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.dark body {
+  background-color: #121212;
+  color: #fff;
+}
+
+.swiper-pagination-bullet-active {
+  background-color: #ff7b00 !important;
+  opacity: 1 !important;
+  transform: scale(1.2);
+  transition: background-color 0.3s, opacity 0.3s, transform 0.3s;
+}
+
+.fade-out {
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+}
+
+.fade-out.fade {
+  opacity: 0;
+}
+
+@media screen and (max-device-width: 812px) {
+  input,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+.animation-click-item {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 150ms;
+}
+
+.animation-click-item:active {
+  transform: scale(0.95);
+}
+
+/* Chrome / Safari / Edge */
+/* ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f2f2f2;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #ff7b00;
+  border-radius: 6px;
+  border: 3px solid #f2f2f2;
+} */
+
+/* Firefox */
+/* * {
+  scrollbar-width: thin;
+  scrollbar-color: #ff7b00 #f2f2f2;
+} */
