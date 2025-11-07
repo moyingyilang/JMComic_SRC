@@ -12,7 +12,7 @@ import GlobalStore from "../../config/GlobalStore";
 const VersionUpdate = (props: any) => {
   const { config, visible } = props;
   const [loading, setLoading] = useState(true);
-  const { jm3_version_info, download_url, app_landing_page } = config.setting;
+  const { jm3_version_info, jm3_download_url, app_landing_page } = config.setting;
   const version = localStorage.getItem("newVersion") || "";
   const dispatch = useAppDispatch();
   const { hotUpdateModalProgress, newVersion } = useAppSelector((state) => state.hotUpdate);
@@ -88,7 +88,7 @@ const VersionUpdate = (props: any) => {
                     <LinearProgressWithLabel value={hotUpdateModalProgress} />
                   </Box>
                   <p className="my-2">無法更新？請點選下方 spk 載點</p>
-                  <a href={GlobalStore.apiUrl + "static/apk/JMComic3v2.0.3.apk?v=20250802"}>
+                  <a href={GlobalStore.apiUrl + jm3_download_url}>
                     <button className="w-full bg-og p-2 shadow-lg rounded shadow-stone-700/50 mb-3">下載點1</button>
                   </a>
                   <a href={app_landing_page}>

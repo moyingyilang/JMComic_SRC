@@ -18,7 +18,12 @@ const CreatorList = (props: any) => {
             <div key={rowIndex} className="grid-cols-2 grid gap-2 px-2">
               {row.map((item, index) => (
                 <div key={index} className="bg-white relative my-2 mx-1 dark:bg-nbk">
-                  <Link to={`/library/list/detail?creatorId=${item.author_id || creatorId}&id=${item.id}`}>
+                  <Link
+                    to={`/library/list/detail?creatorId=${item.author_id || creatorId}&id=${item.id}`}
+                    onClick={() => {
+                      sessionStorage.removeItem("libListSource");
+                    }}
+                  >
                     <img
                       src={setting?.img_host + item.work_image}
                       alt={item.id}

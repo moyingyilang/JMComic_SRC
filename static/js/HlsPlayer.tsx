@@ -13,8 +13,7 @@ const HlsPlayer: React.FC<HlsPlayerProps> = ({ src }) => {
     const video = videoRef.current;
     if (!video) return;
 
-    const lowerSrc = src.toLowerCase();
-    const isMp4 = lowerSrc.includes("prvhls2");
+    const isMp4 = src.toLowerCase().includes("prvhls2");
 
     let hls: Hls | null = null;
 

@@ -10,6 +10,8 @@ import {
   FETCH_ADD_FAVORITE_THUNK,
   FETCH_EDIT_FAVORITE_FOLDER_THUNK,
   FETCH_FAVORITE_LIST_THUNK,
+  FETCH_WATCH_LIST_THUNK,
+  FETCH_GET_WATCH_LIST_THUNK,
 } from "../../actions/memberAction";
 import { CLEAR_MEMBER_LIST } from "../../reducers/memberReducer";
 import { Alert } from "../Alert/Alert";
@@ -17,6 +19,7 @@ import FolderModal from "../../components/Modal/FolderModal";
 import { defaultEditInitialState } from "../../utils/InterFace";
 import { getDateDiffFromNow } from "../../utils/Function";
 import { useEngagementActions } from "../../Hooks/useEngagementActions";
+import Loading from "./Loading";
 
 const ComicList = (props: any) => {
   const {
@@ -46,6 +49,7 @@ const ComicList = (props: any) => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const movedRef = useRef(false);
   const isLikedItem = JSON.parse(localStorage.getItem("likedItems") || "[]");
+  const [markLoading, setMarkLoading] = useState(false);
   const [favoriteSave, setFavoriteSave] = useState<{ like: string[]; mark: string[] }>(() => {
     const storedLikes = localStorage.getItem("likedItems");
     return {
@@ -55,19 +59,30 @@ const ComicList = (props: any) => {
   });
 
   // 漫畫長按刪除
-  const handleStart = (aid: string) => {
-    if (window.location.pathname.includes("member")) {
+  const handleOpenDelWatchComicAlert = (aid: string) => {
+    if (window.location.pathname.includes("member") && listName === "watchList") {
       movedRef.current = false;
       timerRef.current = setTimeout(() => {
         setEditFolder({
           ...editFolder,
           edit: true,
-          type: "del_comic",
+          type: "del_watch_history",
           alert: true,
           message: t("snack.confirm_delete"),
           aid,
         });
-      }, 800);
+      }, 500);
+    }
+  };
+
+  const handleDelWatchComic = async () => {
+    if (editFolder.type === "del_watch_history" && editFolder.aid !== "") {
+      const result = await dispatch(FETCH_WATCH_LIST_THUNK(editFolder.aid)).unwrap();
+      const { status, msg } = result;
+      const statusType = status !== 1 ? "error" : "success";
+      showSnackbar(msg, statusType);
+      setEditFolder((prev: any) => ({ ...prev, ...defaultEditInitialState }));
+      dispatch(FETCH_GET_WATCH_LIST_THUNK(1));
     }
   };
 
@@ -90,10 +105,7 @@ const ComicList = (props: any) => {
 
       const updatedList = exists ? currentList.filter((item: string) => item !== id) : [...currentList, id];
 
-      return {
-        ...prev,
-        [type]: updatedList,
-      };
+      return { ...prev, [type]: updatedList };
     });
   };
 
@@ -116,6 +128,7 @@ const ComicList = (props: any) => {
         showSnackbar(t("login.please_login"), "error");
         setDialogOpen({ ...dialogOpen, login: true });
       } else {
+        setMarkLoading(true);
         handleFindFolder();
         toggleFavoriteState("mark", id);
         const result = await dispatch(FETCH_ADD_FAVORITE_THUNK(id)).unwrap();
@@ -134,11 +147,11 @@ const ComicList = (props: any) => {
               break;
           }
         }
+        // setMarkLoading(false);
         showSnackbar(data.msg, msgType);
       }
     }
   };
-  // console.log(editFolder, "editFolder");
 
   // GetFolderList
   const handleFindFolder = () => {
@@ -150,6 +163,7 @@ const ComicList = (props: any) => {
   // EditFolder
   // type === add / edit / move / del
   const handleEditFolder = async (type: string) => {
+    setMarkLoading(true);
     if (type === "del") {
       setDialogOpen({ ...dialogOpen, alert: true });
     }
@@ -164,8 +178,11 @@ const ComicList = (props: any) => {
     } else {
       showSnackbar(t("comic.added_to_favorites_success"), "success");
     }
+    // setMarkLoading(false);
     setEditFolder((prev: any) => ({ ...prev, ...defaultEditInitialState }));
   };
+
+  // console.log(editFolder, "editFolder");
 
   return (
     <>
@@ -194,10 +211,10 @@ const ComicList = (props: any) => {
                   )}
                   <div
                     className="relative mt-3"
-                    onMouseDown={() => handleStart(item.id)}
+                    onMouseDown={() => handleOpenDelWatchComicAlert(item.id)}
                     onMouseUp={handleEnd}
                     onMouseLeave={handleEnd}
-                    onTouchStart={() => handleStart(item.id)}
+                    onTouchStart={() => handleOpenDelWatchComicAlert(item.id)}
                     onTouchEnd={handleEnd}
                     onTouchMove={handleMove}
                   >
@@ -301,7 +318,7 @@ const ComicList = (props: any) => {
               ))}
             </div>
           ))}
-      {listName !== "mainList" && dialogOpen.folder && (
+      {listName !== "mainList" && listName !== "watchList" && dialogOpen.folder && (
         <FolderModal
           folderList={favoriteList.folder_list}
           dialogOpen={dialogOpen}
@@ -318,6 +335,7 @@ const ComicList = (props: any) => {
           edit={editFolder}
           handleEdit={handleEditFolder}
           handleAction={handleEngagementAction}
+          handleDelWatchComic={handleDelWatchComic}
           showSnackbar={showSnackbar}
         />
       )}

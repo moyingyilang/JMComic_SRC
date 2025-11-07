@@ -1,336 +1,254 @@
-'use strict';
-
-var has = Object.prototype.hasOwnProperty
-  , prefix = '~';
-
-/**
- * Constructor to create a storage for our `EE` objects.
- * An `Events` instance is a plain object whose properties are event names.
- *
- * @constructor
- * @private
- */
-function Events() {}
-
-//
-// We try to not inherit from `Object.prototype`. In some engines creating an
-// instance in this way is faster than calling `Object.create(null)` directly.
-// If `Object.create(null)` is not supported we prefix the event names with a
-// character to make sure that the built-in object properties are not
-// overridden or used as an attack vector.
-//
-if (Object.create) {
-  Events.prototype = Object.create(null);
-
-  //
-  // This hack is needed because the `__proto__` property is still inherited in
-  // some old browsers like Android 4, iPhone 5.1, Opera 11 and Safari 5.
-  //
-  if (!new Events().__proto__) prefix = false;
-}
-
-/**
- * Representation of a single event listener.
- *
- * @param {Function} fn The listener function.
- * @param {*} context The context to invoke the listener with.
- * @param {Boolean} [once=false] Specify if the listener is a one-time listener.
- * @constructor
- * @private
- */
-function EE(fn, context, once) {
-  this.fn = fn;
-  this.context = context;
-  this.once = once || false;
-}
-
-/**
- * Add a listener for a given event.
- *
- * @param {EventEmitter} emitter Reference to the `EventEmitter` instance.
- * @param {(String|Symbol)} event The event name.
- * @param {Function} fn The listener function.
- * @param {*} context The context to invoke the listener with.
- * @param {Boolean} once Specify if the listener is a one-time listener.
- * @returns {EventEmitter}
- * @private
- */
-function addListener(emitter, event, fn, context, once) {
-  if (typeof fn !== 'function') {
-    throw new TypeError('The listener must be a function');
-  }
-
-  var listener = new EE(fn, context || emitter, once)
-    , evt = prefix ? prefix + event : event;
-
-  if (!emitter._events[evt]) emitter._events[evt] = listener, emitter._eventsCount++;
-  else if (!emitter._events[evt].fn) emitter._events[evt].push(listener);
-  else emitter._events[evt] = [emitter._events[evt], listener];
-
-  return emitter;
-}
-
-/**
- * Clear event by name.
- *
- * @param {EventEmitter} emitter Reference to the `EventEmitter` instance.
- * @param {(String|Symbol)} evt The Event name.
- * @private
- */
-function clearEvent(emitter, evt) {
-  if (--emitter._eventsCount === 0) emitter._events = new Events();
-  else delete emitter._events[evt];
-}
-
-/**
- * Minimal `EventEmitter` interface that is molded against the Node.js
- * `EventEmitter` interface.
- *
- * @constructor
- * @public
- */
-function EventEmitter() {
-  this._events = new Events();
-  this._eventsCount = 0;
-}
-
-/**
- * Return an array listing the events for which the emitter has registered
- * listeners.
- *
- * @returns {Array}
- * @public
- */
-EventEmitter.prototype.eventNames = function eventNames() {
-  var names = []
-    , events
-    , name;
-
-  if (this._eventsCount === 0) return names;
-
-  for (name in (events = this._events)) {
-    if (has.call(events, name)) names.push(prefix ? name.slice(1) : name);
-  }
-
-  if (Object.getOwnPropertySymbols) {
-    return names.concat(Object.getOwnPropertySymbols(events));
-  }
-
-  return names;
-};
-
-/**
- * Return the listeners registered for a given event.
- *
- * @param {(String|Symbol)} event The event name.
- * @returns {Array} The registered listeners.
- * @public
- */
-EventEmitter.prototype.listeners = function listeners(event) {
-  var evt = prefix ? prefix + event : event
-    , handlers = this._events[evt];
-
-  if (!handlers) return [];
-  if (handlers.fn) return [handlers.fn];
-
-  for (var i = 0, l = handlers.length, ee = new Array(l); i < l; i++) {
-    ee[i] = handlers[i].fn;
-  }
-
-  return ee;
-};
-
-/**
- * Return the number of listeners listening to a given event.
- *
- * @param {(String|Symbol)} event The event name.
- * @returns {Number} The number of listeners.
- * @public
- */
-EventEmitter.prototype.listenerCount = function listenerCount(event) {
-  var evt = prefix ? prefix + event : event
-    , listeners = this._events[evt];
-
-  if (!listeners) return 0;
-  if (listeners.fn) return 1;
-  return listeners.length;
-};
-
-/**
- * Calls each of the listeners registered for a given event.
- *
- * @param {(String|Symbol)} event The event name.
- * @returns {Boolean} `true` if the event had listeners, else `false`.
- * @public
- */
-EventEmitter.prototype.emit = function emit(event, a1, a2, a3, a4, a5) {
-  var evt = prefix ? prefix + event : event;
-
-  if (!this._events[evt]) return false;
-
-  var listeners = this._events[evt]
-    , len = arguments.length
-    , args
-    , i;
-
-  if (listeners.fn) {
-    if (listeners.once) this.removeListener(event, listeners.fn, undefined, true);
-
-    switch (len) {
-      case 1: return listeners.fn.call(listeners.context), true;
-      case 2: return listeners.fn.call(listeners.context, a1), true;
-      case 3: return listeners.fn.call(listeners.context, a1, a2), true;
-      case 4: return listeners.fn.call(listeners.context, a1, a2, a3), true;
-      case 5: return listeners.fn.call(listeners.context, a1, a2, a3, a4), true;
-      case 6: return listeners.fn.call(listeners.context, a1, a2, a3, a4, a5), true;
+import { jsx as R, jsxs as I } from "react/jsx-runtime";
+import { useRef as y, useEffect as $, useState as U } from "react";
+const F = (t) => t === document.documentElement ? (document.scrollingElement || document.documentElement).scrollTop : t === window ? Math.max(
+  window.pageYOffset,
+  document.documentElement.scrollTop,
+  document.body.scrollTop
+) : t.scrollTop;
+let x = !1;
+try {
+  const t = Object.defineProperty({}, "passive", {
+    get() {
+      x = !0;
     }
-
-    for (i = 1, args = new Array(len -1); i < len; i++) {
-      args[i - 1] = arguments[i];
-    }
-
-    listeners.fn.apply(listeners.context, args);
-  } else {
-    var length = listeners.length
-      , j;
-
-    for (i = 0; i < length; i++) {
-      if (listeners[i].once) this.removeListener(event, listeners[i].fn, undefined, true);
-
-      switch (len) {
-        case 1: listeners[i].fn.call(listeners[i].context); break;
-        case 2: listeners[i].fn.call(listeners[i].context, a1); break;
-        case 3: listeners[i].fn.call(listeners[i].context, a1, a2); break;
-        case 4: listeners[i].fn.call(listeners[i].context, a1, a2, a3); break;
-        default:
-          if (!args) for (j = 1, args = new Array(len -1); j < len; j++) {
-            args[j - 1] = arguments[j];
-          }
-
-          listeners[i].fn.apply(listeners[i].context, args);
-      }
-    }
+  });
+  window.addEventListener("test", null, t);
+} catch {
+}
+const n = {
+  isSupportsPassive: () => x,
+  on(t, o, s, l = { passive: !1 }) {
+    t.addEventListener(o, s, x ? l : !1);
+  },
+  off(t, o, s, l = { passive: !1 }) {
+    t.removeEventListener(o, s, x ? l : !1);
   }
-
-  return true;
-};
-
-/**
- * Add a listener for a given event.
- *
- * @param {(String|Symbol)} event The event name.
- * @param {Function} fn The listener function.
- * @param {*} [context=this] The context to invoke the listener with.
- * @returns {EventEmitter} `this`.
- * @public
- */
-EventEmitter.prototype.on = function on(event, fn, context) {
-  return addListener(this, event, fn, context, false);
-};
-
-/**
- * Add a one-time listener for a given event.
- *
- * @param {(String|Symbol)} event The event name.
- * @param {Function} fn The listener function.
- * @param {*} [context=this] The context to invoke the listener with.
- * @returns {EventEmitter} `this`.
- * @public
- */
-EventEmitter.prototype.once = function once(event, fn, context) {
-  return addListener(this, event, fn, context, true);
-};
-
-/**
- * Remove the listeners of a given event.
- *
- * @param {(String|Symbol)} event The event name.
- * @param {Function} fn Only remove the listeners that match this function.
- * @param {*} context Only remove the listeners that have this context.
- * @param {Boolean} once Only remove one-time listeners.
- * @returns {EventEmitter} `this`.
- * @public
- */
-EventEmitter.prototype.removeListener = function removeListener(event, fn, context, once) {
-  var evt = prefix ? prefix + event : event;
-
-  if (!this._events[evt]) return this;
-  if (!fn) {
-    clearEvent(this, evt);
-    return this;
-  }
-
-  var listeners = this._events[evt];
-
-  if (listeners.fn) {
+}, W = (t) => {
+  for (; t && t.parentNode && t.parentNode !== document.body; ) {
+    const o = window.getComputedStyle(t);
     if (
-      listeners.fn === fn &&
-      (!once || listeners.once) &&
-      (!context || listeners.context === context)
-    ) {
-      clearEvent(this, evt);
+      // The value of `overflow/overflowY` is scroll/auto
+      (["scroll", "auto"].indexOf(o.overflowY) > -1 || ["scroll", "auto"].indexOf(o.overflow) > -1) && // The value of `height/max-height` grather than 0  `
+      (parseInt(o.height, 10) > 0 || parseInt(o.maxHeight, 10) > 0)
+    )
+      return t;
+    t = t.parentNode;
+  }
+  return window;
+}, z = () => {
+  const t = y(), o = y(0), s = y(window), l = y(() => {
+  }), d = (e) => {
+    o.current = 0;
+    const a = (f) => {
+      const h = f.touches[0];
+      o.current = h.pageY;
+    }, c = (f) => {
+      var p;
+      f.touches[0].pageY - o.current > 0 && f.cancelable && F(e) === 0 && ((p = t.current) != null && p.contains(f.target)) && f.preventDefault();
+    }, r = () => {
+      o.current = 0;
+    };
+    return n.on(e, "touchstart", a), n.on(e, "touchmove", c), n.on(e, "touchend", r), n.on(e, "touchcancel", r), () => {
+      n.off(e, "touchstart", a), n.off(e, "touchmove", c), n.off(e, "touchend", r), n.off(e, "touchcancel", r);
+    };
+  };
+  return $(() => {
+    const e = W(t.current);
+    e !== s.current && (l.current(), l.current = d(e), s.current = e);
+  }), [t, s];
+}, A = () => {
+  const t = y(!1);
+  return $(() => (t.current = !1, () => {
+    t.current = !0;
+  }), []), t;
+}, O = () => {
+  const t = y(!0);
+  return t.current ? (t.current = !1, !0) : t.current;
+}, q = (t, o) => {
+  const s = O();
+  $(() => {
+    if (!s)
+      return t();
+  }, o);
+}, _ = (t) => {
+  const o = y(t);
+  return o.current = t, o;
+}, B = {
+  startX: 0,
+  startY: 0,
+  offsetX: 0,
+  offsetY: 0
+};
+function j(t) {
+  return t && !("touches" in t);
+}
+const G = ({
+  onDragStart: t,
+  onDragMove: o,
+  onDragEnd: s
+}) => {
+  const l = y(null), d = _(t), e = _(o), a = _(s);
+  return $(() => {
+    const c = l && l.current;
+    if (!c)
+      return;
+    let r, f = !1;
+    const h = () => {
+      r = {
+        ...B
+      };
+    };
+    h();
+    const i = (u) => {
+      var m;
+      if (f = !0, h(), j(u))
+        r.startX = u.clientX, r.startY = u.clientY;
+      else {
+        const {
+          touches: [w]
+        } = u;
+        r.startX = w.pageX, r.startY = w.pageY;
+      }
+      (m = d.current) == null || m.call(d, u, r);
+    }, p = (u) => {
+      var T;
+      if (!f)
+        return;
+      let m = 0, w = 0;
+      if (j(u))
+        m = u.clientX, w = u.clientY;
+      else {
+        const E = u.touches[0];
+        m = E.pageX, w = E.pageY;
+      }
+      const v = m - r.startX, X = w - r.startY, b = {
+        ...r,
+        offsetX: v,
+        offsetY: X
+      };
+      (T = e.current) != null && T.call(e, u, b) && (r = b);
+    }, g = (u) => {
+      var m;
+      f = !1, (m = a.current) == null || m.call(a, u, r), h();
+    };
+    return n.on(c, "touchstart", i), n.on(c, "touchmove", p), n.on(c, "touchend", g), n.on(c, "touchcancel", g), n.on(c, "mousedown", i), n.on(c, "mousemove", p), n.on(c, "mouseup", g), () => {
+      n.off(c, "touchstart", i), n.off(c, "touchmove", p), n.off(c, "touchend", g), n.off(c, "touchcancel", g), n.off(c, "mousedown", i), n.off(c, "mousemove", p), n.off(c, "mouseup", g);
+    };
+  }, []), l;
+}, Q = ({
+  className: t,
+  style: o,
+  animationDuration: s = 300,
+  completeDelay: l = 500,
+  refreshing: d = !1,
+  headHeight: e = 50,
+  startDistance: a = 30,
+  resistance: c = 0.6,
+  threshold: r = e,
+  onRefresh: f,
+  disabled: h = !1,
+  prefixCls: i = "pull-to-refreshify",
+  renderText: p,
+  children: g
+}) => {
+  const [u, m] = z(), w = A(), [[v, X, b], T] = U(
+    d ? [e, s, "refreshing"] : [0, 0, "normal"]
+  ), E = (Y, S = 0) => {
+    switch (Y) {
+      case "pulling":
+      case "canRelease":
+        T([S, 0, Y]);
+        break;
+      case "refreshing":
+        T([e, s, Y]);
+        break;
+      case "complete":
+        if (T([e, s, Y]), w.current)
+          return;
+        setTimeout(() => {
+          E("normal");
+        }, l);
+        break;
+      default:
+        T([0, s, Y]);
     }
-  } else {
-    for (var i = 0, events = [], length = listeners.length; i < length; i++) {
+  };
+  q(() => {
+    E(d ? "refreshing" : "complete");
+  }, [d]);
+  const L = G({
+    onDragMove: (Y, { offsetY: S }) => {
       if (
-        listeners[i].fn !== fn ||
-        (once && !listeners[i].once) ||
-        (context && listeners[i].context !== context)
-      ) {
-        events.push(listeners[i]);
+        // Not set onRefresh event
+        !f || // Pull up
+        S <= 0 || // Not scrolled to top
+        S > 0 && F(m.current) > 0 || // Refreshing state has been triggered
+        ["refreshing", "complete"].includes(b) || h
+      )
+        return !1;
+      n.isSupportsPassive() || Y.preventDefault();
+      const M = S / window.screen.height, k = S * (1 - M) * c, P = k - a < r ? "pulling" : "canRelease";
+      return E(P, k), !0;
+    },
+    onDragEnd: (Y, { offsetY: S }) => {
+      if (S) {
+        if (b === "pulling") {
+          E("normal");
+          return;
+        }
+        typeof f == "function" && f();
       }
     }
-
-    //
-    // Reset the array, or remove it completely if we have no more listeners.
-    //
-    if (events.length) this._events[evt] = events.length === 1 ? events[0] : events;
-    else clearEvent(this, evt);
-  }
-
-  return this;
+  });
+  let N = 0;
+  return v >= a && (N = (v - a < r ? v - a : r) * 100 / r), /* @__PURE__ */ R(
+    "div",
+    {
+      ref: L,
+      className: t ? `${i} ${t}` : i,
+      style: {
+        minHeight: e,
+        overflowY: "hidden",
+        touchAction: "pan-y",
+        ...o
+      },
+      children: /* @__PURE__ */ I(
+        "div",
+        {
+          ref: u,
+          className: `${i}__content`,
+          style: {
+            willChange: "transform",
+            WebkitTransition: `all ${X}ms`,
+            transition: `all ${X}ms`,
+            WebkitTransform: `translate3d(0, ${v}px, 0)`,
+            transform: `translate3d(0, ${v}px, 0)`
+          },
+          children: [
+            /* @__PURE__ */ R(
+              "div",
+              {
+                className: `${i}__refresh`,
+                style: {
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#909090",
+                  fontSize: "14px",
+                  marginTop: -e,
+                  height: e
+                },
+                children: p(b, N)
+              },
+              v.toFixed(0)
+            ),
+            /* @__PURE__ */ R("div", { className: `${i}__body`, children: g })
+          ]
+        }
+      )
+    }
+  );
 };
-
-/**
- * Remove all listeners, or those of the specified event.
- *
- * @param {(String|Symbol)} [event] The event name.
- * @returns {EventEmitter} `this`.
- * @public
- */
-EventEmitter.prototype.removeAllListeners = function removeAllListeners(event) {
-  var evt;
-
-  if (event) {
-    evt = prefix ? prefix + event : event;
-    if (this._events[evt]) clearEvent(this, evt);
-  } else {
-    this._events = new Events();
-    this._eventsCount = 0;
-  }
-
-  return this;
+export {
+  Q as PullToRefreshify
 };
-
-//
-// Alias methods names because people roll like that.
-//
-EventEmitter.prototype.off = EventEmitter.prototype.removeListener;
-EventEmitter.prototype.addListener = EventEmitter.prototype.on;
-
-//
-// Expose the prefix.
-//
-EventEmitter.prefixed = prefix;
-
-//
-// Allow `EventEmitter` to be imported as module namespace.
-//
-EventEmitter.EventEmitter = EventEmitter;
-
-//
-// Expose the module.
-//
-if ('undefined' !== typeof module) {
-  module.exports = EventEmitter;
-}

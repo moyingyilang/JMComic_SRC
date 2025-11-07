@@ -46,7 +46,6 @@ const Home = () => {
   const [editFolder, setEditFolder] = useState(defaultEditInitialState);
   sessionStorage.setItem("fromPage", location.pathname);
   const trackList = mainList?.length && mainList.find((d: any) => d.id === "26")?.content.map((d: any) => d.id);
-  localStorage.setItem("trackList", JSON.stringify(trackList));
   const stateStr = sessionStorage.getItem("state");
   const mainStatus = stateStr ? JSON.parse(stateStr) : null;
   const { showHotUpdateModal } = useAppSelector((state) => state.hotUpdate);
@@ -94,6 +93,7 @@ const Home = () => {
   };
 
   useEffect(() => {
+    localStorage.setItem("trackList", JSON.stringify(trackList));
     if (coverOpen >= 3 && mainList.length === 0 && !isRefreshing) {
       loadList(false, false, 1000, 0);
     }
@@ -120,12 +120,12 @@ const Home = () => {
   }, [loadMore]);
 
   return (
-    <div className="min-h-screen">
-      {isLoading && <Loading />}
+    <div className="h-full">
       {coverOpen === 1 && <VersionUpdate config={config} visible={showHotUpdateModal} onNext={handleNext} />}
       {coverOpen === 2 && <FirstCover config={config} setConfig={setConfig} ads={ads} onNext={handleNext} />}
       {coverOpen === 3 && <SecondCover setting={setting} ads={ads} onNext={handleNext} />}
       {coverOpen === 4 && <ThreeCover config={config} onNext={handleNext} />}
+      {(coverOpen === 0 || (stateStr && isLoading)) && <Loading />}
       {stateStr && (
         <PullToRefreshify
           completeDelay={1000}

@@ -67,9 +67,9 @@ const Read = () => {
     subEpisode: querySubEp,
     currentChapterId: readId,
   });
-  const [readHistory, setReadHistory] = useState<string[]>(() => {
+  const [readHistory, setReadHistory] = useState<{ [comicId: string]: string[] }>(() => {
     const historyStored = localStorage.getItem("read");
-    return historyStored ? JSON.parse(historyStored) : [];
+    return historyStored ? JSON.parse(historyStored) : {};
   });
   const imageCount = readList.images?.length + 3 || 1;
   const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
@@ -78,8 +78,6 @@ const Read = () => {
   const swiperRef = useRef<any>(null);
 
   useEffect(() => {
-    sessionStorage.removeItem("searchQuery");
-
     const isNative = Capacitor.isNativePlatform();
 
     if (isNative) {
@@ -106,7 +104,7 @@ const Read = () => {
     dispatch(RESET_FORUM_STATE());
     if (readId && queryId) {
       dispatch(FETCH_COMIC_READ_THUNK(readId));
-      dispatch(FETCH_DETAIL_THUNK(queryId));
+      // dispatch(FETCH_DETAIL_THUNK(queryId));
     }
     if (swiperRef.current?.swiper && !isVertical) {
       swiperRef.current.swiper.slideTo(0, 0);
@@ -116,58 +114,55 @@ const Read = () => {
   const loadImages = async () => {
     dispatch(LOAD_COMBIC_DETIAL_LIST({ isLoading: true }));
     const imagesContain = imgRefs.current;
+    const maxIndex = imagesContain.length - 1;
     const indexesToLoad = [
       scrollProgress - 2,
       scrollProgress - 1,
       scrollProgress,
       scrollProgress + 1,
       scrollProgress + 2,
-    ];
+    ].filter((i) => i >= 0 && i <= maxIndex);
 
     try {
-      for (const index of indexesToLoad) {
-        const img = imagesContain[index];
-        if (!img) continue;
+      await Promise.allSettled(
+        indexesToLoad.map(async (index) => {
+          const img = imagesContain[index];
 
-        const existingCanvas = img.nextElementSibling;
-        const isCanvasMissingOrInvalid = !(existingCanvas instanceof HTMLCanvasElement);
+          if (!img) return;
 
-        if (isCanvasMissingOrInvalid) {
-          await new Promise<void>((resolve) => {
-            if (img.complete) {
-              resolve();
-            } else {
-              img.onload = () => resolve();
+          const existingCanvas = img.nextElementSibling;
+          const isCanvasMissingOrInvalid = !(existingCanvas instanceof HTMLCanvasElement);
+
+          if (isCanvasMissingOrInvalid) {
+            await new Promise<void>((resolve) => {
+              if (img.complete) resolve();
+              else {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+              }
+            });
+
+            await scramble_image(img, readList.id, readList.scramble_id, img.alt);
+            const canvas = img.nextElementSibling;
+
+            if (canvas instanceof HTMLCanvasElement) {
+              canvas.style.position = "absolute";
+              canvas.style.top = "0";
+              canvas.addEventListener("click", () => setCloseNav((prev) => !prev));
+              canvas.addEventListener("contextmenu", (e) => e.preventDefault());
             }
-          });
 
-          // 進行 scramble 圖片處理
-          await scramble_image(img, readList.id, readList.scramble_id, img.alt);
+            dispatch(LOAD_COMBIC_DETIAL_LIST({ isLoading: false }));
 
-          const canvas = img.nextElementSibling;
-
-          if (canvas instanceof HTMLCanvasElement) {
-            canvas.style.position = "absolute";
-            canvas.style.top = "0";
-            canvas.addEventListener("click", () => {
-              setCloseNav((prev) => !prev);
-            });
-            canvas.addEventListener("contextmenu", (e) => {
-              e.preventDefault();
-            });
+            if (canvas === null || img.src.endsWith(".gif")) {
+              img.classList.remove("opacity-0");
+              img.style.opacity = "1";
+              img.dataset.noScrambleMark = "noScramble";
+              img.addEventListener("click", () => setCloseNav((prev) => !prev));
+            }
           }
-          if (canvas === null || img.src.indexOf(".gif") === 0) {
-            img.classList.remove("opacity-0");
-            img.style.opacity = "1";
-            img.dataset.noScrambleMark = "noScramble";
-            img.addEventListener("click", () => {
-              setCloseNav((prev) => !prev);
-            });
-          }
-
-          dispatch(LOAD_COMBIC_DETIAL_LIST({ isLoading: false }));
-        }
-      }
+        })
+      );
     } finally {
       dispatch(LOAD_COMBIC_DETIAL_LIST({ isLoading: false }));
     }
@@ -185,57 +180,70 @@ const Read = () => {
       let lastScrollTop = 0;
       let accumulatedScrollDown = 0;
       let accumulatedScrollUp = 0;
+      let ticking = false;
 
       const handleScroll = () => {
-        const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
-        const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
 
-        // 處理進度邏輯
-        const { images, total_page } = readList;
-        const progress = Math.ceil((scrollTop / scrollHeight) * imageCount);
+            // ⏳ 計算進度
+            const { images, total_page } = readList;
+            const progress = Math.ceil((scrollTop / scrollHeight) * imageCount);
 
-        if (images?.length) {
-          setScrollProgress(progress);
+            if (images?.length) {
+              setScrollProgress(progress);
 
-          if (detailList.series?.length > 0) {
-            const thirdLastImageIndex = total_page - 3;
-            const lastObject = detailList.series[detailList.series.length - 1];
-            const storedData = localStorage.getItem("dontShowExpiry");
-            if (progress === thirdLastImageIndex && querySubEp === lastObject.sort) {
-              setMsgOpen({ ...msgOpen, readTrack: storedData === null });
+              if (detailList.series?.length > 0) {
+                const lastImageIndex = total_page + 3;
+                const lastObject = detailList.series[detailList.series.length - 1];
+                const storedData = localStorage.getItem("dontShowExpiry");
+                if (progress === lastImageIndex && querySubEp === lastObject.sort) {
+                  setMsgOpen({ ...msgOpen, readTrack: storedData === null });
+                }
+              }
             }
-          }
+
+            // 處理滾動方向與 canvas 清除
+            const delta = scrollTop - lastScrollTop;
+            const bufferDistance = 2000;
+            const removeDistance = 10;
+
+            if (delta > 0) {
+              accumulatedScrollDown += delta;
+              accumulatedScrollUp = 0;
+              // 向下滾動
+              if (accumulatedScrollDown >= bufferDistance) {
+                imgRefs.current.forEach((img, index) => {
+                  const canvas = img?.nextElementSibling;
+                  if (canvas instanceof HTMLCanvasElement && index < progress - removeDistance) {
+                    canvas.remove();
+                  }
+                });
+                accumulatedScrollDown = 0;
+              }
+            } else if (delta < 0) {
+              accumulatedScrollUp += Math.abs(delta);
+              accumulatedScrollDown = 0;
+
+              // 向上滾動
+              if (accumulatedScrollUp >= bufferDistance) {
+                imgRefs.current.forEach((img, index) => {
+                  const canvas = img?.nextElementSibling;
+                  if (canvas instanceof HTMLCanvasElement && index > progress + removeDistance) {
+                    canvas.remove();
+                  }
+                });
+                accumulatedScrollUp = 0;
+              }
+            }
+            lastScrollTop = scrollTop;
+            ticking = false; // reset
+          });
+
+          ticking = true;
         }
-
-        // 滾動方向與距離累加
-        const delta = scrollTop - lastScrollTop;
-
-        if (delta > 0) {
-          // 向下滾動
-          accumulatedScrollDown += delta;
-          accumulatedScrollUp = 0;
-
-          if (accumulatedScrollDown >= 2000) {
-            const canvasList = document.querySelectorAll("canvas");
-            if (canvasList.length > 0) {
-              canvasList[0].remove();
-            }
-            accumulatedScrollDown = 0;
-          }
-        } else if (delta < 0) {
-          // 向上滾動
-          accumulatedScrollUp += Math.abs(delta);
-          accumulatedScrollDown = 0;
-
-          if (accumulatedScrollUp >= 2000) {
-            const canvasList = document.querySelectorAll("canvas");
-            if (canvasList.length > 0) {
-              canvasList[canvasList.length - 1].remove();
-            }
-            accumulatedScrollUp = 0;
-          }
-        }
-        lastScrollTop = scrollTop;
       };
 
       window.addEventListener("scroll", handleScroll);
@@ -324,17 +332,19 @@ const Read = () => {
 
   // 閱讀紀錄儲存
   useEffect(() => {
-    if (readHistory.length > 0) {
-      localStorage.setItem("read", JSON.stringify(readHistory));
-    }
+    localStorage.setItem("read", JSON.stringify(readHistory));
   }, [readHistory]);
 
-  const handlerReadStorage = (currentChapterId: string) => {
-    setReadHistory((prevHistory: string[]) => {
-      if (!prevHistory.includes(currentChapterId)) {
-        return [...prevHistory, currentChapterId];
+  const handlerReadStorage = (comicId: string, chapterId: string) => {
+    setReadHistory((prev) => {
+      const chapters = prev[comicId] || [];
+      if (!chapters.includes(chapterId)) {
+        return {
+          ...prev,
+          [comicId]: [...chapters, chapterId],
+        };
       }
-      return prevHistory;
+      return prev;
     });
   };
 
@@ -382,7 +392,7 @@ const Read = () => {
           subEpisode: targetItem.sort,
           currentChapterId: targetItem.id,
         }));
-        handlerReadStorage(targetItem.id);
+        handlerReadStorage(queryId, targetItem.id);
         navigate(
           `/comic/detail/read?id=${queryId}&readId=${targetItem.id}&episode=${chunkIndex}&subEpisode=${targetItem.sort}`
         );
@@ -456,20 +466,24 @@ const Read = () => {
   return (
     <>
       {isLoading && <Loading />}
-      <div className="min-h-screen bg-white text-white relative">
+      <div className="h-full bg-white text-white relative">
         <motion.div
           initial={{ y: 0 }}
           animate={{ y: closeNav ? -64 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className={`fixed top-0 w-full h-14 bg-nbk bg-opacity-90 flex justify-between items-center px-3 py-2 z-50`}
+          className={`fixed top-0 top-safe w-full h-14 bg-nbk bg-opacity-90 flex justify-between items-center px-3 py-2 z-50`}
         >
-          <GoBack back={`/comic/detail?id=${queryId || detailList.series_id}`} />
+          <GoBack
+            back={`/comic/detail?id=${queryId || detailList.series_id}&readId=${readId}&episode=${
+              seriesGroups.episode
+            }&subEpisode=${seriesGroups.subEpisode}`}
+          />
           <p className="truncate w-10/12">{readList.name}</p>
           <ShareIcon sx={{ fontSize: 26, stroke: "white", strokeWidth: 1 }} onClick={() => setShare(true)} />
         </motion.div>
         <div
           onClick={(e) => e.preventDefault()}
-          className="pt-20 pb-40 flex items-center min-h-screen"
+          className="pt-20 pb-40 flex items-center h-full"
           ref={containerRef}
           style={{
             flexDirection: isVertical ? "column" : "row",
@@ -480,14 +494,14 @@ const Read = () => {
         >
           {isVertical ? (
             <>
-              <AdComponent adKey="app_chapter_next" />
+              <AdComponent adKey="app_chapter_top" comicId={queryId} />
               {readList.images?.length > 0 &&
                 readList.images.map((d: any, i: number) => (
-                  <div key={d.page} className="w-full relative">
+                  <div key={d.page} className="w-full relative mt-[-2px]">
                     <img
                       ref={(el) => (imgRefs.current[i] = el as HTMLImageElement)}
                       src={d.image}
-                      alt={d.image.match(/\/([^\/]+)\.webp/)[1]}
+                      alt={d.image?.match(/\/([^\/]+)\.webp/)?.[1] ?? null}
                       width="100%"
                       height="auto"
                       id={"img_" + d.page}
@@ -500,8 +514,8 @@ const Read = () => {
                     />
                   </div>
                 ))}
-              <AdComponent adKey="app_thewayhome" />
-              <AdComponent adKey="app_chapter_last" />
+              <AdComponent adKey="app_thewayhome" comicId={queryId} />
+              <AdComponent adKey="app_chapter_last" comicId={queryId} />
             </>
           ) : (
             <>
@@ -512,7 +526,7 @@ const Read = () => {
                 ref={swiperRef}
               >
                 <SwiperSlide>
-                  <AdComponent adKey="app_chapter_next" />
+                  <AdComponent adKey="app_chapter_top" />
                 </SwiperSlide>
                 {readList.images?.length > 0 &&
                   readList.images.map((d: any, i: number) => (
@@ -520,7 +534,7 @@ const Read = () => {
                       <img
                         ref={(el) => (imgRefs.current[i] = el as HTMLImageElement)}
                         src={d.image}
-                        alt={d.image.match(/\/([^\/]+)\.webp/)[1]}
+                        alt={d.image?.match(/\/([^\/]+)\.webp/)?.[1] ?? null}
                         width="100%"
                         height="auto"
                         loading="lazy"
@@ -533,10 +547,10 @@ const Read = () => {
                     </SwiperSlide>
                   ))}
                 <SwiperSlide className="w-100%">
-                  <AdComponent adKey="app_thewayhome" />
+                  <AdComponent adKey="app_thewayhome" comicId={queryId} />
                 </SwiperSlide>
                 <SwiperSlide>
-                  <AdComponent adKey="app_chapter_last" />
+                  <AdComponent adKey="app_chapter_last" comicId={queryId} />
                 </SwiperSlide>
               </Swiper>
             </>

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 export default function Loading() {
   const { t } = useTranslation();
   return (
-    <div className="absolute left-1/2 top-1/2 transform -translate-y-2 -translate-x-1/2 text-center text-gy z-40">
+    <div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center text-gy z-40">
       <img src="/images/loading.gif" alt="loading" width="80px" />
       <p>{t("comic.loading")}</p>
     </div>

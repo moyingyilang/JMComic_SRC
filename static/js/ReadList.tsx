@@ -68,7 +68,7 @@ const ReadList = (props: any) => {
                 listName={"watchList"}
                 list={watchList.list}
                 comicTags={true}
-                comicCheck={true}
+                comicCheck={false}
                 logined={logined}
                 editFolder={editFolder}
                 setEditFolder={setEditFolder}

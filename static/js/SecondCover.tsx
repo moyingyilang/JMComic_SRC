@@ -3,7 +3,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useTranslation } from "react-i18next";
 import { useDelayedFlag } from "../../../Hooks";
 import AdComponent from "../../Ads/AdComponent";
-import { getRandomItems } from "../../../utils/Function";
 import { LOAD_MAIN_LIST } from "../../../reducers/mainReducer";
 import { FETCH_COVER_ADS_THUNK } from "../../../actions/mainAction";
 import { useAppDispatch } from "../../../store/hooks";
@@ -13,11 +12,10 @@ const SecondCover = (props: any) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const showCloseBtn = useDelayedFlag(3000);
-  const { indexes: firstRandomItem } = getRandomItems(ads["app_splash"]?.advs);
-  const { indexes: secondRandomItem } = getRandomItems(ads["app_splash2"]?.advs);
+  const adsContent = localStorage.getItem("adsContent");
 
   useEffect(() => {
-    if (setting.ipcountry) {
+    if (setting.ipcountry && !adsContent) {
       const ipcountry = setting.ipcountry;
       const lang = setting.is_cn === 0 ? "TW" : "CN";
       dispatch(LOAD_MAIN_LIST({ isLoading: true }));
@@ -27,7 +25,7 @@ const SecondCover = (props: any) => {
 
   return (
     <>
-      <div className="w-full min-h-screen absolute left-0 top-0 z-50 bg-white dark:bg-[#545454]">
+      <div className="w-full h-full absolute left-0 top-0 z-50 bg-white dark:bg-[#545454]">
         <div className="relative w-full h-28 flex justify-center items-end">
           <span className="">{t("modal.ad_close_hint")}</span>
           {showCloseBtn && (
@@ -36,12 +34,9 @@ const SecondCover = (props: any) => {
             </button>
           )}
         </div>
-        {[
-          { key: "app_splash", index: firstRandomItem[0] },
-          { key: "app_splash2", index: secondRandomItem[0] },
-        ].map(({ key, index }) => (
-          <div key={key} className="flex justify-center items-center mx-auto mt-10 overflow-hidden">
-            <AdComponent adKey={key} adIndex={index} />
+        {["app_splash", "app_splash2"].map((adKey: string) => (
+          <div key={adKey} className="flex justify-center items-center mx-auto mt-10 overflow-hidden">
+            <AdComponent adKey={adKey} />
           </div>
         ))}
       </div>

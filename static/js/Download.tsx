@@ -77,7 +77,7 @@ const Download = () => {
             <GoBack back={-1} />
             <div className="ml-4">{t("detail.download_page")}</div>
           </div>
-          <div className="w-full mx-auto flex justify-center mb-24">
+          <div className="w-full mx-auto flex justify-center my-4">
             {!isLoading && <AdComponent adKey="download1" />}
           </div>
           <div className="bg-white m-3 p-4">
@@ -88,21 +88,26 @@ const Download = () => {
             <div>
               <img src={albumDownloadDetail.img_url} alt={albumDownloadDetail.title} />
             </div>
-            <div className="flex justify-center items-center p-6">
-              <p className="text-2xl ml-2">{problem.problem} =</p>
-              <input
-                type="text"
-                value={userAnswer}
-                maxLength={10}
-                onChange={(e) => setUserAnswer(e.target.value)}
-                placeholder={t("detail.enter_answer")}
-                className="w-32 h-12 px-2 ml-2"
-              />
-              <button className="bg-og rounded-md text-white ml-2 p-3" onClick={checkAnswer}>
-                {t("detail.download")}
-              </button>
-              <ReplayIcon className="text-3xl ml-2" onClick={regenerateProblem} />
-            </div>
+            {problem.problem ? (
+              <div className="flex justify-center items-center p-6">
+                <p className="text-2xl ml-2">{problem.problem} =</p>
+                <input
+                  type="text"
+                  value={userAnswer}
+                  maxLength={10}
+                  onChange={(e) => setUserAnswer(e.target.value)}
+                  placeholder={t("detail.enter_answer")}
+                  className="w-32 h-12 px-2 ml-2"
+                />
+                <button className="bg-og rounded-md text-white ml-2 p-3" onClick={checkAnswer}>
+                  {t("detail.download")}
+                </button>
+                <ReplayIcon className="text-3xl ml-2" onClick={regenerateProblem} />
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">Loading captcha...</div>
+            )}
+
             <div className="grid grid-cols-2 gap-2 mb-10">
               <div className="max-h-[120px] overflow-hidden object-top">
                 {!isLoading && <AdComponent adKey="download2" />}
@@ -111,7 +116,7 @@ const Download = () => {
                 {!isLoading && <AdComponent adKey="download3" />}
               </div>
             </div>
-            <div className="text-[red] mt-6">
+            <div className="text-[red] pt-6 pb-72">
               {Array.isArray(downloadRules) && downloadRules.map((d: any) => <p key={d}>{d}</p>)}
             </div>
           </div>

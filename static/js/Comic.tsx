@@ -100,8 +100,8 @@ const Comic = () => {
   return (
     <>
       {isMoreListLoading && <Loading />}
-      <div className="min-h-screen transition-all duration-300 dark:text-tgy">
-        <header className="bg-bbk fixed top-0 left-0 right-0 z-50">
+      <div className="h-full transition-all duration-300 dark:text-tgy">
+        <header className="bg-bbk fixed top-0 top-safe left-0 right-0 z-50">
           <div className="h-20 w-full bg-bbk text-white flex items-end px-2 py-3">
             <GoBack back="/" />
             <p className="ml-4 text-2xl text-og">{isWeekly ? t("comic.weekly_update") : query}</p>

@@ -202,7 +202,7 @@ const Games: React.FC = () => {
   return (
     <>
       {/* 頂部固定導航列 */}
-      <div className="sticky top-0 w-full text-white z-50 bg-[#242424]">
+      <div className="sticky top-safe w-full text-white z-50 bg-[#242424]">
         <Header />
         {/* 橫幅輪播 */}
         <Swiper

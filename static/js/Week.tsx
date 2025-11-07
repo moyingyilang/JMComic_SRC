@@ -68,9 +68,9 @@ const Week = () => {
   }, [weekList]);
 
   return (
-    <div className="min-h-screen">
+    <div className="h-full">
       {isLoading && <Loading />}
-      <div className="sticky top-0 z-50">
+      <div className="sticky top-safe z-50">
         <div className="sticky top-0 h-20 bg-bbk text-white flex items-end p-2 py-3">
           <GoBack back={sessionStorage.getItem("fromPage") || "/"} />
           <p className="ml-4 text-2xl text-og">{t("comic.must_watch")}</p>

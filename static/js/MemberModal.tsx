@@ -186,8 +186,7 @@ const MemberModal = (props: any) => {
   const memberLogout = async () => {
     const result = await dispatch(FETCH_LOGOUT_THUNK()).unwrap();
     if (result.code === 200) {
-      setConfig((prev: any) => ({ ...prev, logined: false }));
-      clearAuth(true);
+      clearAuth(setConfig, true);
       showSnackbar(t("login.logout_success"), "success");
     }
   };

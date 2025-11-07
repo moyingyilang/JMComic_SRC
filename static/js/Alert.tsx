@@ -54,7 +54,8 @@ export const DownloadAlert = (props: any) => {
 };
 
 export const Alert = (props: any) => {
-  const { edit, setEdit, handleEdit, handleAction, showSnackbar } = props;
+  const { edit, setEdit, handleEdit, handleAction, handleDelWatchComic, showSnackbar } = props;
+  const { type, aid } = edit;
   const { t } = useTranslation();
   return (
     <>
@@ -68,12 +69,23 @@ export const Alert = (props: any) => {
             </button>
             <button
               onClick={() => {
-                edit.type === "del" && handleEdit("del");
-                if (edit.aid !== "") {
-                  edit.type === "del_comic" && handleAction("mark", edit.aid);
-                } else {
-                  setEdit({ ...edit, edit: false, alert: false, aid: "" });
-                  edit.type === "del_comic" && showSnackbar(t("member.please_select_comic"), "error");
+                switch (type) {
+                  case "del_watch_history":
+                    handleDelWatchComic();
+                    break;
+
+                  case "del":
+                    handleEdit("del");
+                    break;
+
+                  case "del_comic":
+                    if (aid) {
+                      handleAction("mark", aid);
+                    } else {
+                      showSnackbar(t("member.please_select_comic"), "error");
+                      setEdit({ ...edit, edit: false, alert: false, aid: "" });
+                    }
+                    break;
                 }
               }}
             >

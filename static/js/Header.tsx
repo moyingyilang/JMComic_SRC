@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
 import RestaurantIcon from "@mui/icons-material/Restaurant";
@@ -28,7 +28,7 @@ const Header = (props: any) => {
   ];
 
   return (
-    <header className="sticky top-0 w-full bg-bbk text-white z-30">
+    <header className="sticky top-safe w-full bg-bbk text-white z-30">
       <div className="h-14 flex items-center">
         <div className="flex w-6/12 pl-3">
           <Link to="/">
@@ -76,18 +76,20 @@ const Header = (props: any) => {
             </div>
           </div>
           <div className="h-10 flex items-center">
-            {catList.ranking.map((d: any) => (
-              <span
-                key={d.key}
-                className={`pl-4 ${filter.sort === d.key ? "text-og" : ""}`}
-                onClick={() => {
-                  setFilter({ ...filter, sort: d.key });
-                  setTabChange(true);
-                }}
-              >
-                {d.title}
-              </span>
-            ))}
+            {(filter.slug === "" ? catList?.ranking : catList?.ranking.slice(0, -1))?.map(
+              (d: { key: string; title: string }) => (
+                <span
+                  key={d.key}
+                  className={`pl-4 cursor-pointer ${filter.sort === d.key ? "text-og" : ""}`}
+                  onClick={() => {
+                    setFilter({ ...filter, sort: d.key });
+                    setTabChange(true);
+                  }}
+                >
+                  {d.title}
+                </span>
+              )
+            )}
           </div>
           {subList.length > 0 && (
             <div className="h-10 flex items-center">

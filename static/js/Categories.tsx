@@ -151,7 +151,7 @@ const Categories = () => {
   return (
     <>
       {isLoading && <Loading />}
-      <div className="border-none min-h-screen">
+      <div className="border-none h-full">
         <div className="sticky top-0 z-50 bg-white dark:bg-bk">
           <Header
             currentPage="categories"
@@ -161,7 +161,7 @@ const Categories = () => {
             filter={filter}
             setFilter={setFilter}
           />
-          <div className="w-full bg-defaultBg flex items-center p-3 my-2  dark:bg-nbk">
+          <div className="w-full top-safe bg-defaultBg flex items-center p-3 my-2  dark:bg-nbk">
             <span className="text-lg w-20">{t("comic.popular_tags")}</span>
             <div
               className="flex overflow-x-auto whitespace-nowrap"
@@ -169,7 +169,7 @@ const Categories = () => {
             >
               {cateFilterList.tags?.length > 0 &&
                 cateFilterList.tags.map((d: any, i: number) => (
-                  <Link key={d + i} to={`/search?filter=${d}`} onClick={() => sessionStorage.setItem("searchQuery", d)}>
+                  <Link key={d + i} to={`/search?filter=${d}`}>
                     <p className="bg-white rounded-md border border-solid border-bk ml-3 px-2 py-1 dark:bg-nbk dark:border-white">
                       {d}
                     </p>
@@ -212,12 +212,7 @@ const Categories = () => {
                 <div className="w-full grid grid-cols-4 place-items-start mt-2">
                   {catList.current.marks?.length > 0 &&
                     catList.current.marks.map((d: any, i: number) => (
-                      <Link
-                        to={`/search?filter=${d.tag}`}
-                        key={d.tag + i}
-                        className="flex items-center flex-col"
-                        onClick={() => sessionStorage.setItem("searchQuery", d)}
-                      >
+                      <Link to={`/search?filter=${d.tag}`} key={d.tag + i} className="flex items-center flex-col">
                         <p className="bg-white text-center w-24 text-wrap border border-solid border-bk rounded-md mb-1 p-1 dark:bg-nbk dark:border-white">
                           #{d.tag}
                         </p>

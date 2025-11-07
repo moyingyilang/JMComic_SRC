@@ -21,11 +21,9 @@ const checkAuthExpiry = (setConfig: React.Dispatch<React.SetStateAction<any>>) =
   if (!expiry) return;
 
   const expiryTime = parseInt(expiry, 10);
-  const buffer = 10 * 1000; // 提前10秒清理
 
-  if (Date.now() > expiryTime - buffer) {
-    clearAuth();
-    setConfig((prev: any) => ({ ...prev, logined: false }));
+  if (Date.now() > expiryTime) {
+    clearAuth(setConfig);
   }
 };
 
@@ -48,7 +46,8 @@ export const AuthChecker = ({ setConfig }: { setConfig: React.Dispatch<React.Set
   return null;
 };
 
-export const clearAuth = (clearAll?: boolean) => {
+export const clearAuth = (setConfig: React.Dispatch<React.SetStateAction<any>>, clearAll?: boolean) => {
+  setConfig((prev: any) => ({ ...prev, logined: false }));
   localStorage.removeItem("jwttoken");
   localStorage.removeItem("authExpiry");
   if (clearAll) {

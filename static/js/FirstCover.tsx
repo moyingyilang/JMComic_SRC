@@ -24,6 +24,7 @@ const FirstPlate = (props: any) => {
     GlobalStore.updateApiUrl(newUrl);
     setConfig((prev: any) => ({ ...prev, host: newUrl }));
     const timer = setTimeout(() => {
+      clearAuth(setConfig);
       onNext();
     }, 500);
     return () => clearTimeout(timer);
@@ -32,14 +33,14 @@ const FirstPlate = (props: any) => {
     if (config.hostReady) {
       const timer = setTimeout(() => {
         setLoading(false);
-      }, 2000);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [config.hostReady]);
 
   return (
     <>
-      <div className="w-full min-h-screen bg-[#545454] absolute left-0 top-0 z-50 pb-20">
+      <div className="w-full h-full bg-[#545454] absolute left-0 top-0 z-50 pb-20">
         <>
           <div className="flex justify-center items-center mx-auto mt-24 overflow-hidden">
             <div className="h-[250px]">

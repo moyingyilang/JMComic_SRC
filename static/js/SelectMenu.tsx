@@ -64,7 +64,11 @@ const SelectMenu = (props: any) => {
                     key={option.service || option}
                     onClick={() => {
                       handleClose(dropdown.id);
-                      setFilter({ ...filter, [dropdown.id]: option.service || (option !== "All" ? option : "") });
+                      setFilter({
+                        ...filter,
+                        start: true,
+                        [dropdown.id]: option.service || (option !== "All" ? option : ""),
+                      });
                     }}
                   >
                     {option.name || option}

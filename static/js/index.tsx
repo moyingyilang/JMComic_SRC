@@ -60,10 +60,19 @@ export function useDelayedFlag(delay: number = 1500): boolean {
 
 export const useScrollToTop = () => {
   const scrollToTop = useCallback(() => {
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
+    // 嘗試平滑滾動
+    try {
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    } catch (e) {
+      // fallback
+      window.scrollTo(0, 0);
+    }
+    // 強制修正（iOS）
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
   }, []);
 
   return scrollToTop;

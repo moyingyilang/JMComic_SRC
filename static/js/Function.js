@@ -15,20 +15,11 @@ export function getRandomItems(arr, count = 1) {
   if (!Array.isArray(arr) || arr.length === 0) {
     return { items: [], indexes: [] };
   }
-
   const maxCount = Math.min(count, arr.length);
-  const result = [];
-  const indexes = new Set();
-
-  while (result.length < maxCount) {
-    const index = Math.floor(Math.random() * arr.length);
-    if (!indexes.has(index)) {
-      indexes.add(index);
-      result.push(arr[index]);
-    }
-  }
-
-  return { items: result, indexes: Array.from(indexes) };
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  const result = shuffled.slice(0, maxCount);
+  const indexes = result.map((item) => arr.indexOf(item));
+  return { items: result, indexes };
 }
 
 // 計算幾天前

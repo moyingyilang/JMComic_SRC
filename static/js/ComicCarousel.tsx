@@ -16,6 +16,8 @@ import { CLEAR_MEMBER_LIST } from "../../reducers/memberReducer";
 import FolderModal from "../../components/Modal/FolderModal";
 import { getDateDiffFromNow, getWeekInfo } from "../../utils/Function";
 import { defaultEditInitialState } from "../../utils/InterFace";
+import Loading from "./Loading";
+import { LOAD_MAIN_LIST } from "../../reducers/mainReducer";
 
 const ComicCarousel = (props: any) => {
   const { t, listName, list, setting, logined, editFolder, setEditFolder, showSnackbar, setDialogOpen, dialogOpen } =
@@ -63,6 +65,7 @@ const ComicCarousel = (props: any) => {
       if (!logined) {
         showSnackbar(t("login.please_login"), "error");
       } else {
+        dispatch(LOAD_MAIN_LIST({ isLoading: true }));
         handleFindFolder();
         toggleFavoriteState("mark", id);
         setEditFolder({ ...editFolder, aid: id });
@@ -76,6 +79,7 @@ const ComicCarousel = (props: any) => {
         if (data.status === "ok" && data.type === "add") {
           setDialogOpen({ ...dialogOpen, folder: true });
         }
+        dispatch(LOAD_MAIN_LIST({ isLoading: false }));
       }
     }
   };
@@ -88,9 +92,9 @@ const ComicCarousel = (props: any) => {
 
   // EditFolder
   const handleEditFolder = async (type: string) => {
-    console.log(editFolder, "editFolder");
+    dispatch(LOAD_MAIN_LIST({ isLoading: true }));
+    // console.log(editFolder, "editFolder");
     const { folder_id, folder_name, aid } = editFolder;
-
     if (folder_id !== "") {
       const result = await dispatch(FETCH_EDIT_FAVORITE_FOLDER_THUNK({ type, folder_id, folder_name, aid })).unwrap();
       const { msg, status } = result.data;
@@ -101,6 +105,7 @@ const ComicCarousel = (props: any) => {
     } else {
       showSnackbar(t("comic.added_to_favorites_success"), "success");
     }
+    dispatch(LOAD_MAIN_LIST({ isLoading: false }));
     setEditFolder((prev: any) => ({ ...prev, ...defaultEditInitialState }));
   };
 

@@ -69,6 +69,17 @@ const getApiHostInfo = () => {
     };
 };
 
+const fetchWithTimeout = (url: string, method: string, fetchPromise: Promise<Response>): Promise<Response> => {
+    const TIMEOUT = 15000;
+    const defaultErrorMsg = `${method} 發生錯誤(timeout)，請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version} 版，最新版本為 ${version} 版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
+    return Promise.race([
+        fetchPromise,
+        new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error(defaultErrorMsg)), TIMEOUT)
+        ),
+    ]);
+};
+
 const HttpUtil = {
     fetchGet: async (
         url: string,
@@ -88,53 +99,49 @@ const HttpUtil = {
                 url += "?" + paramsBody;
             }
         }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-
         try {
             const jwttoken = JSON.parse(localStorage.getItem("jwttoken") as string) || "";
             const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || "";
 
-            const response = await fetch(url, {
-                credentials: 'include',
-                signal: controller.signal,
-                headers: {
-                    "Cookie": "AVS=" + memberInfo?.s,
-                    "Tokenparam": tokenParam,
-                    "Token": token,
-                    "Authorization": `Bearer ${jwttoken}`,
-                },
-            });
-
-            clearTimeout(timeout);
+            const response = await fetchWithTimeout(
+                url,
+                "GET",
+                fetch(url, {
+                    credentials: "include",
+                    headers: {
+                        "Tokenparam": tokenParam,
+                        "Token": token,
+                        "Authorization": jwttoken ? `Bearer ${jwttoken}` : "",
+                        "Cookie": memberInfo ? `AVS=${memberInfo?.s}` : "",
+                    },
+                }),
+            );
 
             if (!response.ok && response.status !== 401) {
-                const error = new Error("HTTP error") as any;
-                error.statusCode = response.status;
-                error.retryLimitReached = getRetryCount >= maxRetries;
-                throw error;
+                const defaultErrorMsg = `Get 發生錯誤，請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version} 版，最新版本為 ${version} 版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
+
+                if (getRetryCount < maxRetries) {
+                    getRetryCount++;
+                    failCallback(`${response.status}\n${defaultErrorMsg}`);
+                    HttpUtil.fetchGet(url, {}, successCallback, failCallback);
+                    return;
+                } else {
+                    failCallback(`達到最大重試次數\n${defaultErrorMsg}`);
+                    showErrorModal(`${response.status}\n${defaultErrorMsg}`);
+                }
             }
 
             await tryDecryption(response, successCallback, url);
 
         } catch (error: any) {
-            clearTimeout(timeout);
-            const statusCode = error?.statusCode ?? "未知";
-            const errorMsg = `Get 發生錯誤，狀態碼：${statusCode} 請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version} 版，最新版本為 ${version} 版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
-
-            if (error.name === "AbortError") {
-                failCallback("請求逾時 (Timeout)");
-                showErrorModal("請求逾時 (Timeout)\n" + errorMsg);
-            } else if (error.retryLimitReached) {
-                failCallback("達到最大重試次數");
-                showErrorModal(errorMsg);
-            } else {
-                getRetryCount++;
-                failCallback(errorMsg);
-                return HttpUtil.fetchGet(url, {}, successCallback, failCallback);
+            failCallback(error);
+            const errorMessage = error?.message || error;
+            if (errorMessage.includes("請求逾時")) {
+                showErrorModal(`錯誤：${errorMessage}`);
             }
+            throw new Error(errorMessage);
         }
+
     },
     fetchPost: async (
         url: string,
@@ -142,6 +149,7 @@ const HttpUtil = {
         successCallback: (responseObj: any) => void,
         failCallback: (error: any) => void,
     ): Promise<any> => {
+
         const formData = new FormData();
 
         if (Object.keys(params).length > 0) {
@@ -149,54 +157,49 @@ const HttpUtil = {
                 formData.append(key, value);
             });
         }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-
         try {
             const jwttoken = JSON.parse(localStorage.getItem("jwttoken") as string) || "";
             const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || "";
 
-            const response = await fetch(url, {
-                method: "POST",
-                credentials: "include",
-                signal: controller.signal,
-                headers: {
-                    "Cookie": "AVS=" + memberInfo?.s,
-                    "Tokenparam": tokenParam,
-                    "Token": token,
-                    "Authorization": `Bearer ${jwttoken}`,
-                },
-                body: formData,
-            });
-
-            clearTimeout(timeout);
+            const response = await fetchWithTimeout(
+                url,
+                "POST",
+                fetch(url, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Tokenparam": tokenParam,
+                        "Token": token,
+                        "Authorization": jwttoken ? `Bearer ${jwttoken}` : "",
+                        "Cookie": memberInfo ? `AVS=${memberInfo?.s}` : "",
+                    },
+                    body: formData,
+                }),
+            );
 
             if (!response.ok && response.status !== 401) {
-                const error = new Error("HTTP error") as any;
-                error.statusCode = response.status;
-                error.retryLimitReached = getRetryCount >= maxRetries;
-                throw error;
+                const defaultErrorMsg = `POST 發生錯誤，請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version}版，最新版本為 ${version}版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
+
+                if (postRetryCount < maxRetries) {
+                    postRetryCount++;
+                    failCallback(`${response.status}\n${defaultErrorMsg}`);
+                    HttpUtil.fetchPost(url, {}, successCallback, failCallback);
+                    return;
+                } else {
+                    failCallback(`達到最大重試次數\n${defaultErrorMsg}`);
+                    showErrorModal(`${response.status}\n${defaultErrorMsg}`);
+                }
             }
 
             await tryDecryption(response, successCallback, url);
 
         } catch (error: any) {
-            clearTimeout(timeout);
-            const statusCode = error?.statusCode ?? "未知";
-            const errorMsg = `POST 發生錯誤，狀態碼：${statusCode} 請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version} 版，最新版本為 ${version} 版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
-
-            if (error.name === "AbortError") {
-                failCallback("請求逾時 (Timeout)");
-                showErrorModal("請求逾時 (Timeout)\n" + errorMsg);
-            } else if (error.retryLimitReached) {
-                failCallback("達到最大重試次數");
-                showErrorModal(errorMsg);
-            } else {
-                getRetryCount++;
-                failCallback(errorMsg);
-                return HttpUtil.fetchGet(url, {}, successCallback, failCallback);
+            failCallback(error);
+            const errorMessage = error?.message || error;
+            if (errorMessage.includes("請求逾時")) {
+                showErrorModal(errorMessage);
             }
+            throw new Error(errorMessage);
         }
     },
 };

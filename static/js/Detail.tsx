@@ -21,7 +21,7 @@ import AdComponent from "../../components/Ads/AdComponent";
 import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
 import TopBtn from "../../components/Common/TopBtn";
 import { CLEAR_FORUM_LIST } from "../../reducers/forumReducer";
-import { CLEAR_DETIAL_LIST } from "../../reducers/detailReducer";
+import { CLEAR_DETIAL_LIST, RESET_DETAIL_STATE } from "../../reducers/detailReducer";
 
 const Detail = () => {
   const { config, setConfig } = useGlobalConfig();
@@ -33,21 +33,23 @@ const Detail = () => {
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
   const searchParams = new URLSearchParams(location.search);
   const queryId = searchParams.get("id") as string;
+  const readId = searchParams.get("readId") as string;
+  const queryEp = searchParams.get("episode") as string;
+  const querySubEp = searchParams.get("subEpisode") as string;
   const menuItems = t("detail.menu_items", { returnObjects: true });
   const [tab, setTab] = useState(1);
   const [showTagMore, setShowTagMore] = useState(false);
   const [share, setShare] = useState(false);
   const dispatch = useAppDispatch();
   const { detailList, isLoading } = useAppSelector((state) => state.detail);
-  const goBackState = sessionStorage.getItem("fromPage") || "";
-  const goBackDetailState = sessionStorage.getItem("relatedQuery") || "";
-  const filterSerch = sessionStorage.getItem("searchQuery");
+
   const [goBack, setGoBack] = useState<string | number>("");
   const [clearFinish, setClearFinish] = useState(false);
-  const [readHistory, setReadHistory] = useState<string[]>(() => {
+  const [readHistory, setReadHistory] = useState<{ [comicId: string]: string[] }>(() => {
     const historyStored = localStorage.getItem("read");
-    return historyStored ? JSON.parse(historyStored) : [];
+    return historyStored ? JSON.parse(historyStored) : {};
   });
+
   const [dialogOpen, setDialogOpen] = useState({
     login: false,
     signUp: false,
@@ -70,28 +72,38 @@ const Detail = () => {
   });
 
   useEffect(() => {
-    setSeriesGroups({ menus: [], episode: 0, subEpisode: "1", currentChapterId: "" });
-    dispatch(CLEAR_DETIAL_LIST("detailList"));
-  }, [queryId]);
+    if (queryId && readId) {
+      handlerReadEpisodeStorage();
+      setTab(2);
+      setClearFinish(true);
+    } else {
+      setSeriesGroups({ menus: [], episode: 0, subEpisode: "1", currentChapterId: "" });
+      dispatch(RESET_DETAIL_STATE());
+    }
+  }, [queryId, readId]);
 
   useEffect(() => {
     scrollToTop();
-    if (queryId && Object.keys(detailList).length === 0) {
+    if (queryId && detailList && Object.keys(detailList)?.length === 0) {
       dispatch(FETCH_DETAIL_THUNK(queryId));
       setClearFinish(true);
     }
-  }, [queryId, Object.keys(detailList).length, logined, dispatch]);
+  }, [queryId, detailList, logined, dispatch]);
 
   useEffect(() => {
     const chunkSize = 10;
-    const { series } = detailList;
-    if (queryId && clearFinish && series?.length > 0) {
+    if (queryId && clearFinish && detailList?.series?.length > 0) {
+      const { series } = detailList;
       const chunkedSeries = [];
       for (let i = 0; i < series.length; i += chunkSize) {
         chunkedSeries.push(series.slice(i, i + chunkSize));
       }
       const currentIndex = series.findIndex((item: any) => item.id === queryId);
       const chunkItem = series[currentIndex];
+
+      const storageKey = "readEp";
+      const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      const index = existing.findIndex((item: any) => item.id === queryId);
 
       const chunkIndex = chunkedSeries
         .reverse()
@@ -100,27 +112,53 @@ const Detail = () => {
       setSeriesGroups({
         ...seriesGroups,
         menus: chunkedSeries,
-        episode: chunkIndex || 0,
-        subEpisode: chunkItem?.sort || series[0]?.sort || "",
-        currentChapterId: chunkItem?.id || series[0]?.id || String(detailList.id),
+        episode: Number(existing[index]?.episode) || chunkIndex || 0,
+        subEpisode: existing[index]?.subEpisode || chunkItem?.sort || series[0]?.sort || "",
+        currentChapterId: existing[index]?.readId || chunkItem?.id || series[0]?.id || String(detailList.id),
       });
     }
-  }, [queryId, clearFinish, detailList.series]);
+  }, [queryId, clearFinish, detailList?.series]);
 
   // read history localStorage
   useEffect(() => {
-    if (readHistory.length > 0) {
-      localStorage.setItem("read", JSON.stringify(readHistory));
-    }
+    localStorage.setItem("read", JSON.stringify(readHistory));
   }, [readHistory]);
 
-  const handlerReadStorage = (currentChapterId: string) => {
-    setReadHistory((prevHistory: string[]) => {
-      if (!prevHistory.includes(currentChapterId)) {
-        return [...prevHistory, currentChapterId];
+  const handlerReadStorage = (comicId: string, chapterId: string) => {
+    setReadHistory((prev) => {
+      const chapters = prev[comicId] || [];
+      if (!chapters.includes(chapterId)) {
+        return {
+          ...prev,
+          [comicId]: [...chapters, chapterId],
+        };
       }
-      return prevHistory;
+      return prev;
     });
+  };
+
+  // read episode history localStorage
+  const handlerReadEpisodeStorage = () => {
+    if (!queryId) return;
+
+    const newEntry = {
+      id: queryId,
+      readId: readId,
+      episode: queryEp,
+      subEpisode: querySubEp,
+    };
+
+    const storageKey = "readEp";
+    const existing: (typeof newEntry)[] = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    const index = existing.findIndex((item) => item.id === queryId);
+
+    if (index !== -1) {
+      existing[index] = newEntry;
+    } else {
+      existing.push(newEntry);
+    }
+
+    localStorage.setItem(storageKey, JSON.stringify(existing));
   };
 
   // exchange decode comic
@@ -140,33 +178,44 @@ const Detail = () => {
 
   // full color comic check
   const handleClick = () => {
-    if (Object.keys(detailList).length > 0) {
+    if (Object.keys(detailList)?.length > 0) {
       const { purchased } = detailList;
       const isPurchased = purchased || purchased === "";
 
       if (!isPurchased) {
         setDialogOpen({ ...dialogOpen, buyComic: true });
       } else {
-        handlerReadStorage(queryId as string);
+        const lastReadChapter = readHistory[queryId]?.slice(-1)[0] || seriesGroups.currentChapterId;
+        handlerReadStorage(queryId, seriesGroups.currentChapterId);
+        const displayValue = lastReadChapter === "" ? queryId : lastReadChapter;
+
         navigate(
-          `/comic/detail/read?id=${queryId}&readId=${queryId}&episode=${seriesGroups.episode}&subEpisode=${seriesGroups.subEpisode}`
+          `/comic/detail/read?id=${queryId}&readId=${displayValue}&episode=${seriesGroups.episode}&subEpisode=${seriesGroups.subEpisode}`
         );
       }
     }
   };
 
   // goback
+  const goBackState = sessionStorage.getItem("fromPage") || "";
+  const relatedQuery = sessionStorage.getItem("relatedQuery") || "";
+  const filterSerch = sessionStorage.getItem("searchQuery") || "";
+
   useEffect(() => {
-    if (goBackDetailState && goBackDetailState.split("?id=")[1] !== queryId) {
-      setGoBack(goBackDetailState);
+    const gobackSearch = `/search?filter=${filterSerch}`;
+    const gobackDetail = `/comic/detail?id=${relatedQuery}`;
+
+    if (relatedQuery) {
+      setGoBack(gobackDetail);
     } else if (filterSerch) {
-      setGoBack(-1);
-      // sessionStorage.removeItem("searchQuery");
+      setGoBack(gobackSearch);
     } else {
-      sessionStorage.removeItem("relatedFromDetail");
       setGoBack(goBackState);
     }
-  }, [goBackDetailState, queryId]);
+    if (relatedQuery === queryId) {
+      sessionStorage.removeItem("relatedQuery");
+    }
+  }, [relatedQuery, queryId]);
 
   return (
     <>
@@ -220,7 +269,9 @@ const Detail = () => {
           </div>
         </div>
         <button onClick={handleClick} className="w-full bg-og flex justify-center text-white mt-[-70px]">
-          <p className="py-4 text-lg">{t("detail.start_reading")}</p>
+          <p className="py-4 text-lg">
+            {queryId in readHistory ? t("detail.continue_reading") : t("detail.start_reading")}
+          </p>
         </button>
         <nav className="grid grid-cols-3 sticky top-0 bg-defaultBg overflow-hidden dark:bg-bk z-30">
           {Array.isArray(menuItems) &&
@@ -240,7 +291,7 @@ const Detail = () => {
             ))}
         </nav>
         <div className="max-h-[70px] overflow-hidden">
-          <AdComponent adKey="app_detail_tab_bottom" />
+          <AdComponent adKey="app_detail_tab_bottom_jm3" comicId={queryId} />
         </div>
         <motion.div
           initial={{ opacity: 0, x: "0%" }}
@@ -322,7 +373,7 @@ const Detail = () => {
           )}
         </motion.div>
         <div className="max-h-[70px] overflow-hidden">
-          <AdComponent adKey="album_detail" closeBtn={true} />
+          <AdComponent adKey="app_detail_introduction_bottom_jm3" comicId={queryId} closeBtn={true} />
         </div>
       </div>
       {share && (

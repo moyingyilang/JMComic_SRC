@@ -152,7 +152,7 @@ const DialogModal = (props: any) => {
           )}
           {dialogOpen.readSource && (
             <DialogContent>
-              <AdComponent adKey="app_chapter_next" />
+              <AdComponent adKey="app_speed" />
               {Array.isArray(readImgSource) &&
                 readImgSource.map((d: any) => (
                   <Button
@@ -212,6 +212,7 @@ const DialogModal = (props: any) => {
                     setSearchConfig((prev: any) => ({ ...prev, start: true, sort: d }));
                     handlerSearch(searchConfig.query, d.key);
                     handleClose(e);
+                    sessionStorage.setItem("searchSort", d.title);
                   }}
                 >
                   {d.title}

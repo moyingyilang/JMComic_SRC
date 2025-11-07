@@ -33,7 +33,7 @@ const BlogsList = (props: any) => {
                   </div>
                 </div>
                 <div className="h-40 pt-2">
-                  <AdComponent key={i + 1 * 10} adKey="app_blogs_ten" />
+                  <AdComponent key={i + 1 * 10} adKey="app_blogs_ten_jm3" />
                 </div>
               </div>
             )}
@@ -98,8 +98,8 @@ const BlogsList = (props: any) => {
             </div>
           </div>
         ))}
-      <div className="mb-4">
-        <AdComponent key={2} adKey="app_categories_more_bottom" />
+      <div className="mb-4 mx-0">
+        <AdComponent adKey="app_blogs_bottom" />
       </div>
     </>
   );

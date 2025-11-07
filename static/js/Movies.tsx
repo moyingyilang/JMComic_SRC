@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { FETCH_MOVIES_LIST_THUNK, FETCH_LATEST_HANIME_THUNK } from "../../actions/moviesAction";
@@ -17,7 +17,7 @@ import { useGlobalConfig } from "../../GlobalContext";
 import CircularProgress from "@mui/material/CircularProgress";
 import AdComponent from "../../components/Ads/AdComponent";
 import { PullToRefreshify } from "react-pull-to-refreshify";
-import { renderText } from "../../utils/Function";
+import { getRandomItems, renderText } from "../../utils/Function";
 import { useInView } from "react-intersection-observer";
 import Header from "../../components/Common/Header";
 import { useTranslation } from "react-i18next";
@@ -49,7 +49,7 @@ const Movies = () => {
     { label: t("movies.category.adult"), videoType: "movie", searchQuery: "" },
     { label: t("movies.category.uncensored"), videoType: "movie", searchQuery: t("movies.category.uncensored") },
     { label: t("movies.category.hanime"), videoType: "video", searchQuery: "" },
-    { label: t("movies.category.outflow"), videoType: "iqiye", searchQuery: "" },
+    // { label: t("movies.category.outflow"), videoType: "iqiye", searchQuery: "" },
     { label: t("movies.category.cosplay"), videoType: "cos", searchQuery: "" },
   ];
 
@@ -146,10 +146,16 @@ const Movies = () => {
     loadMore();
   }, [loadMore]);
 
+  const adKey = "app_movies_top_banner";
+  const movieAds = ads[adKey]?.advs;
+  const movieRandomIndex = useMemo(() => {
+    return getRandomItems(movieAds, movieAds?.length).indexes;
+  }, [movieAds]);
+
   return (
     <div className="dark:bg-bbk transition-all duration-300">
       {isLoading && <Loading />}
-      <div className="sticky top-0 w-full bg-[#242424] text-white z-50">
+      <div className="sticky top-safe w-full bg-[#242424] text-white z-50">
         <Header />
         <div className="flex items-center space-x-6 p-2">
           {categories.map(({ label, videoType, searchQuery }, index) => {
@@ -179,8 +185,8 @@ const Movies = () => {
         onTouchEnd={() => setTimeout(() => setIsSwiping(false), 100)}
         className="mySwiper h-[250px]"
       >
-        {config.ads["app_movies_top_banner"]?.advs?.map((_: null, index: number) => (
-          <SwiperSlide key={index}>
+        {movieRandomIndex?.map((itemIndex: any) => (
+          <SwiperSlide key={itemIndex}>
             <div className="relative">
               <div
                 className="absolute inset-0 z-10"
@@ -190,7 +196,7 @@ const Movies = () => {
                   backgroundColor: "transparent",
                 }}
               />
-              <AdComponent adKey="app_movies_top_banner" adIndex={index} />
+              <AdComponent adKey={adKey} adIndex={itemIndex} />
             </div>
           </SwiperSlide>
         ))}

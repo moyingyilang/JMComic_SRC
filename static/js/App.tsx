@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import { AuthChecker } from "./Hooks/useAuth";
+import { AuthChecker, clearAuth } from "./Hooks/useAuth";
 import Loading from "./components/Common/Loading";
 import useScrollRestoration from "./Hooks/useScrollRestoration";
 import usePageTracking from "./Hooks/usePageTrack";
@@ -13,7 +13,7 @@ import { usePWAProtection, useDevtoolsBlocker, useBackButtonExit } from "./Hooks
 import GlobalStore from "./config/GlobalStore";
 import { getRandomItems } from "./utils/Function";
 import ViewportMeta from "./components/Common/ViewportMeta";
-import { Capacitor } from "@capacitor/core";
+import Clarity from "@microsoft/clarity";
 
 const Main = React.lazy(() => import("./pages/Main/Main"));
 const Week = React.lazy(() => import("./pages/Main/Week"));
@@ -58,9 +58,9 @@ const App = () => {
   useDevtoolsBlocker();
 
   if (process.env.REACT_APP_ENV === "production") {
-    console.log("Running in Production Mode");
+    console.log("Running in Production Mode!");
   } else if (process.env.REACT_APP_ENV === "development") {
-    console.log("Running in Development Mode");
+    console.log("Running in Development Mode!");
   }
 
   // 攔截同步 JS 錯誤
@@ -71,39 +71,6 @@ const App = () => {
     //   window.location.href = "/";
     // }, 60000);
   };
-
-  useEffect(() => {
-    const isNative = Capacitor.isNativePlatform();
-    if (!isNative) {
-      const CURRENT_VERSION = process.env.REACT_APP_VERSION || "2.0.0";
-      const VERSION_KEY = "newVersion";
-
-      const storedVersion = localStorage.getItem(VERSION_KEY);
-
-      if (storedVersion !== CURRENT_VERSION) {
-        localStorage.removeItem(VERSION_KEY);
-        sessionStorage.clear();
-        // unregister 舊 SW
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.getRegistrations().then((registrations) => {
-            registrations.forEach((reg) => reg.unregister());
-          });
-        }
-        // 清除自己快取名稱開頭的 cache
-        if ("caches" in window) {
-          caches.keys().then((keys) => {
-            keys.forEach((key) => {
-              if (key.startsWith("offline-cache-")) {
-                caches.delete(key);
-              }
-            });
-          });
-        }
-        // 用 replace 重新整理避免歷史紀錄
-        window.location.replace(window.location.href);
-      }
-    }
-  }, []);
 
   // host init
   useEffect(() => {
@@ -130,35 +97,46 @@ const App = () => {
     }
   }, [config.hostReady]);
 
+  // Clarity
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") {
+      const projectId = "tpc23aa4d5";
+      Clarity.init(projectId);
+      Clarity.identify("custom-id", "custom-session-id", "custom-page-id", "friendly-name");
+    }
+  }, []);
+
   return (
     <>
       <ViewportMeta />
       <AuthChecker setConfig={setConfig} />
-      <Suspense fallback={<Loading />}>
-        <Routes>
-          <Route path="/" element={<Main />} />
-          <Route path="/blogs" element={<Blog />} />
-          <Route path="/blogs/detail" element={<BlogsDetail />} />
-          <Route path="/week" element={<Week />} />
-          <Route path="/search" element={<Search />} />
-          <Route path="/comic" element={<Comic />} />
-          <Route path="/comic/detail" element={<Detail />} />
-          <Route path="/comic/detail/download" element={<Download />} />
-          <Route path="/comic/detail/read" element={<Read />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="/library/list" element={<LibraryList />} />
-          <Route path="/library/list/detail" element={<LibraryDetail />} />
-          <Route path="/categories" element={<Categories />} />
-          <Route path="/forum" element={<Forum />} />
-          <Route path="/movies" element={<Movies />} />
-          <Route path="/movies/:id" element={<MoviesPlayer />} />
-          <Route path="/games" element={<Games />} />
-          <Route path="/member" element={<Member />} />
-          <Route path="/daily" element={<Daily />} />
-          <Route path="*" element={<ErrorPage />} />
-          <Route path="/test" element={<TestComponent />} />
-        </Routes>
-      </Suspense>
+      <div className="safe-area">
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            <Route path="/" element={<Main />} />
+            <Route path="/blogs" element={<Blog />} />
+            <Route path="/blogs/detail" element={<BlogsDetail />} />
+            <Route path="/week" element={<Week />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/comic" element={<Comic />} />
+            <Route path="/comic/detail" element={<Detail />} />
+            <Route path="/comic/detail/download" element={<Download />} />
+            <Route path="/comic/detail/read" element={<Read />} />
+            <Route path="/library" element={<Library />} />
+            <Route path="/library/list" element={<LibraryList />} />
+            <Route path="/library/list/detail" element={<LibraryDetail />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/forum" element={<Forum />} />
+            <Route path="/movies" element={<Movies />} />
+            <Route path="/movies/:id" element={<MoviesPlayer />} />
+            <Route path="/games" element={<Games />} />
+            <Route path="/member" element={<Member />} />
+            <Route path="/daily" element={<Daily />} />
+            <Route path="*" element={<ErrorPage />} />
+            <Route path="/test" element={<TestComponent />} />
+          </Routes>
+        </Suspense>
+      </div>
       {exit.alert && <ConfirmAlert edit={exit} setEdit={setExit} handleAction={confirmExit} />}
     </>
   );

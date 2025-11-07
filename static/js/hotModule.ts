@@ -74,7 +74,7 @@ export async function needUpdate(): Promise<string> {
 
 async function downloadBuildZip(): Promise<ArrayBuffer> {
     // await waitForApiUrl();
-    const ZIP_URL = `${GlobalStore.apiUrl}static/jmapp3apk/build.enc`;
+    const ZIP_URL = `${GlobalStore.apiUrl}static/jmapp3apk/build.enc?v=${process.env.REACT_APP_VERSION}`;
     const res = await fetch(ZIP_URL);
     if (!res.ok) throw new Error(`Download failed: ${res.status} ${res.statusText}`);
     return await res.arrayBuffer();
@@ -112,7 +112,7 @@ async function getDecrypt() {
         console.log("Waiting for API URL...");
         await waitForApiUrl();
     }
-    const url = `${GlobalStore.apiUrl}static/jmapp3apk/get.php?target=encrypt_key.json`;
+    const url = `${GlobalStore.apiUrl}static/jmapp3apk/encrypt_key.json`;
     try {
         const response = await fetch(url);
         const result = await response.json();

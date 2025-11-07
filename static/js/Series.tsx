@@ -34,7 +34,7 @@ const Series = (props: any) => {
                         key={index}
                         to={`/comic/detail/read?id=${queryId}&readId=${item.id}&episode=${i}&subEpisode=${item.sort}`}
                         onClick={() => {
-                          handlerReadStorage(String(item.id));
+                          handlerReadStorage(queryId, String(item.id));
                           setSeriesGroups((prev: any) => ({
                             ...prev,
                             subEpisode: item.sort,
@@ -48,7 +48,7 @@ const Series = (props: any) => {
                             ${
                               seriesGroups.subEpisode === item.sort
                                 ? "bg-og text-white"
-                                : readHistory.includes(item.id)
+                                : readHistory[queryId]?.includes(item.id)
                                 ? "bg-white text-og"
                                 : ""
                             }

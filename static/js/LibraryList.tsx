@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import TopBtn from "../../components/Common/TopBtn";
 import { useGlobalConfig } from "../../GlobalContext";
-import { GoBack } from "../../Hooks";
+import { GoBack, useScrollToTop } from "../../Hooks";
 import { FETCH_CREATOR_AUTHOR_WORK_THUNK } from "../../actions/creatorAction";
 import { LOAD_CREATOR_LIST } from "../../reducers/creatorReducer";
 import CreatorList from "../../components/Library/CreatorList";
@@ -14,31 +14,40 @@ import { useTranslation } from "react-i18next";
 const LibraryList = () => {
   const { config } = useGlobalConfig();
   const { setting, logined } = config;
+  const scrollToTop = useScrollToTop();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const { creatorAuthorWorkList, isLoading } = useAppSelector((state) => state.creator);
-  const list = creatorAuthorWorkList.list;
-  const [filter, setFilter] = useState<any>({ language: "", source: "" });
   const location = useLocation();
+  const { creatorAuthorWorkList, isLoading } = useAppSelector((state) => state.creator);
   const searchParams = new URLSearchParams(location.search);
   const creatorId = searchParams.get("creatorId") as string;
+  const libCreatorId = sessionStorage.getItem("libCreatorId") || "";
+  const libListSource = sessionStorage.getItem("libListSource") || "";
+  const list = creatorAuthorWorkList.list;
+  const [filter, setFilter] = useState<any>({ start: false, language: "", source: libListSource });
 
   // GetList
   const loadList = (isLoadMore: boolean = false, isRefreshing: boolean = false, id: string = creatorId) => {
     dispatch(LOAD_CREATOR_LIST({ isLoading: true, isLoadMore, isRefreshing }));
     dispatch(FETCH_CREATOR_AUTHOR_WORK_THUNK({ id, lang: filter.language, source: filter.source }));
+    sessionStorage.setItem("libListSource", filter.source);
+    setFilter({ ...filter, start: false });
   };
 
   useEffect(() => {
-    if (creatorId) {
+    if (creatorId !== libCreatorId || filter.start) {
+      scrollToTop();
+      sessionStorage.setItem("libCreatorId", creatorId);
       loadList();
+    } else {
+      dispatch(LOAD_CREATOR_LIST({ isLoading: false }));
     }
-  }, [dispatch, creatorId, filter]);
+  }, [dispatch, creatorId, filter.start]);
 
   return (
     <>
       {isLoading && <Loading />}
-      <div className="min-h-screen bg-defaultBg dark:bg-bk dark:text-tgy">
+      <div className="h-full bg-defaultBg dark:bg-bk dark:text-tgy">
         <div className="sticky top-0 h-16 bg-bbk flex items-end p-2 py-3 z-50">
           <GoBack back="/library" />
         </div>

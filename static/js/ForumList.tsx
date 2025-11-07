@@ -1,12 +1,17 @@
 import ReplyIcon from "@mui/icons-material/Reply";
 import FavoriteIcon from "@mui/icons-material/Favorite";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AdComponent from "../Ads/AdComponent";
 import { useDelayedFlag } from "../../Hooks";
 
 const ForumList = (props: any) => {
   const navigate = useNavigate();
   const hasScrolled = useDelayedFlag();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const queryId = searchParams.get("id") || "";
+  const comicId = location.pathname?.includes("detail") ? queryId : "";
+
   const {
     t,
     setting,
@@ -52,7 +57,7 @@ const ForumList = (props: any) => {
                     <div className="w-full flex flex-row">
                       <div className="w-16 flex justify-start items-center"></div>
                       <div className="ml-2">
-                        {hasScrolled && !isLoading && <AdComponent adKey="app_forum_middle" />}
+                        {hasScrolled && !isLoading && <AdComponent adKey="app_forum_middle" comicId={comicId} />}
                       </div>
                     </div>
                   </div>

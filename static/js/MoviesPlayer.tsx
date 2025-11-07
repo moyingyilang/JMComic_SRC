@@ -3,8 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import WestIcon from "@mui/icons-material/West";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 import { Button } from "@mui/material";
-
 import { LazyLoadImage } from "react-lazy-load-image-component";
 import { useParams, useLocation } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -15,6 +15,7 @@ import { RESET_MOVIES_PLAYER } from "../../reducers/moviesPlayerReducer";
 import AdComponent from "../../components/Ads/AdComponent";
 import { useTranslation } from "react-i18next";
 import GlobalStore from "../../config/GlobalStore";
+import { useScrollToTop } from "../../Hooks";
 const BASE_URL = GlobalStore.apiUrl || "";
 
 const MoviesPlayer = () => {
@@ -31,6 +32,7 @@ const MoviesPlayer = () => {
   const related = moviesDetail?.related_videos;
   const series = moviesDetail?.videoSeries;
   const { t } = useTranslation();
+  const scrollToTop = useScrollToTop();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -42,6 +44,7 @@ const MoviesPlayer = () => {
   useEffect(() => {
     dispatch(RESET_MOVIES_PLAYER());
     if (id && videoType) {
+      scrollToTop();
       dispatch(FETCH_MOVIE_PLAYER_THUNK({ id, video_type: videoType }));
     }
   }, [id, videoType]);
@@ -91,9 +94,16 @@ const MoviesPlayer = () => {
       {isPlaying && <HlsPlayer src={video?.video_src ?? ""} />}
 
       <div className="p-3">
-        <a href={video?.full_url} target="_blank" rel="noopener noreferrer external">
-          <Button className="w-full bg-og text-white mb-4">{t("movies.watch_full_video")}</Button>
-        </a>
+        <Button
+          className="w-full bg-og text-white text-base flex items-center justify-center shadow-lg shadow-stone-700/50  mb-4"
+          onClick={(e) => {
+            e.preventDefault();
+            window.open(video?.full_url, "_blank");
+          }}
+        >
+          <span className="mr-2">{t("movies.watch_full_video")}</span>
+          <PlayCircleOutlineIcon className="align-middle text-4xl" />
+        </Button>
         <div className="flex flex-col gap-2 mb-4">
           <p className="text-lg text-gray-500">
             {video?.date && <span>{video?.date}．</span>}
@@ -266,7 +276,7 @@ const MoviesPlayer = () => {
                     <LazyLoadImage
                       className="w-full h-full object-cover rounded"
                       placeholderSrc="/images/title-circle.webp"
-                      src={item.photo}
+                      src={BASE_URL + item.photo}
                       alt={item.title}
                     />
                   </p>
@@ -283,7 +293,7 @@ const MoviesPlayer = () => {
           <AdComponent adKey="app_movie_bottom_left_1" />
           <AdComponent adKey="app_movie_bottom_right_1" />
         </div>
-        <AdComponent adKey="app_movie_bottom_center" />
+        <AdComponent adKey="app_movie_bottom_center_jm3" />
         <div className="grid grid-cols-2">
           <AdComponent adKey="app_movie_bottom_left_2" />
           <AdComponent adKey="app_movie_bottom_right_2" />
@@ -292,7 +302,7 @@ const MoviesPlayer = () => {
       </div>
 
       <div className="fixed bottom-0 w-full z-10">
-        <AdComponent adKey="app_movie_fixed_bottom" closeBtn={true} />
+        <AdComponent adKey="app_movie_fixed_bottom_jm3" closeBtn={true} />
       </div>
     </div>
   );

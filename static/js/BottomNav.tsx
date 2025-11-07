@@ -13,6 +13,7 @@ import AdComponent from "../../components/Ads/AdComponent";
 import { FETCH_NOTIFICATIONS_UNREAD_THUNK } from "../../actions/memberAction";
 import { useGlobalConfig } from "../../GlobalContext";
 import { useAdResizeWatcher } from "../../Hooks";
+import { getRandomItems } from "../../utils/Function";
 
 const BottomNav = (props: any) => {
   const { currentPage } = props;
@@ -51,6 +52,17 @@ const BottomNav = (props: any) => {
   const handleAdResize = () => {
     setAdResize(true);
   };
+
+  const navAds: Record<string, string> = {
+    main: "app_bottom_bar_jm3",
+    categories: "app_categories_bottom_jm3",
+    games: "app_categories_bottom_jm3",
+    movies: "app_movies_fixed_bottom_jm3",
+    member: "board1",
+  };
+
+  const currentAdKey = navAds[currentPage];
+
   return (
     <>
       {currentPage !== "forum" && (
@@ -60,8 +72,7 @@ const BottomNav = (props: any) => {
             adResize ? "bottom-[3rem]" : "bottom-[4.5em]"
           }`}
         >
-          {/* <div ref={containerRef} className={`fixed bottom-[3.5rem] left-0 right-0`}> */}
-          <AdComponent adKey="board1" closeBtn={true} handleAdResize={handleAdResize} />
+          {currentAdKey && <AdComponent adKey={currentAdKey} closeBtn={true} handleAdResize={handleAdResize} />}
         </div>
       )}
       <div className="fixed bottom-0 left-0 right-0 w-full z-20">

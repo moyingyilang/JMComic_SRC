@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -26,9 +26,10 @@ import {
 } from "../../actions/memberAction";
 import { CLEAR_MEMBER_LIST } from "../../reducers/memberReducer";
 import { DetailHelpData } from "../../assets/JsonData";
-import CommonUtil from "../../utils/Function";
+import CommonUtil, { getRandomItems } from "../../utils/Function";
 import { defaultEditInitialState } from "../../utils/InterFace";
 import { useImageInterval } from "../../Hooks";
+import Loading from "../Common/Loading";
 
 const Desc = (props: any) => {
   const {
@@ -59,13 +60,28 @@ const Desc = (props: any) => {
   const { favoriteList } = useAppSelector((state) => state.member);
   const trackList = JSON.parse(localStorage.getItem("trackList") as string) || [];
   const adsContent = JSON.parse(localStorage.getItem("adsContent") as string) || [];
-  const middleAds = adsContent.stype.app_detail_between_author_and_related;
   const isTrackItem = trackList.includes(queryId);
   const isLikedItem = JSON.parse(localStorage.getItem("likedItems") as string) || [];
   const [favoriteSave, setFavoriteSave] = useState<{ like: string[]; mark: string[] }>({ like: [], mark: [] });
+  const [markLoading, setMarkLoading] = useState(false);
   const [isTrack, setIsTrack] = useState(false);
-  const currentImage = useImageInterval(10000);
-  const middleAdsItem = middleAds[currentImage]?.advs[0];
+  const middleAds = adsContent.stype.app_detail_between_author_and_related;
+  const currentImage = useImageInterval(5000);
+
+  const middleAdsRandomIndex = useMemo(() => {
+    return getRandomItems(middleAds, middleAds.length).indexes;
+  }, [middleAds]);
+
+  const middleAdsItem = middleAds[middleAdsRandomIndex[currentImage]]?.advs[0];
+
+  useEffect(() => {
+    if (detailList?.is_favorite) {
+      setFavoriteSave((prev) => ({
+        ...prev,
+        mark: [...prev.mark, queryId],
+      }));
+    }
+  }, [detailList, queryId]);
 
   // like && mark
   const toggleFavoriteState = (type: "like" | "mark", id: string) => {
@@ -101,6 +117,7 @@ const Desc = (props: any) => {
         showSnackbar(t("login.please_login"), "error");
         setDialogOpen({ ...dialogOpen, login: true });
       } else {
+        setMarkLoading(true);
         handleFindFolder();
         toggleFavoriteState("mark", id);
         setEditFolder({ ...editFolder, aid: id });
@@ -113,6 +130,7 @@ const Desc = (props: any) => {
         if (data.status === "ok" && data.type === "add") {
           setDialogOpen({ ...dialogOpen, folder: true });
         }
+        setMarkLoading(false);
       }
     }
   };
@@ -125,6 +143,7 @@ const Desc = (props: any) => {
 
   // EditFolder
   const handleEditFolder = async (type: string) => {
+    setMarkLoading(true);
     const { folder_id, folder_name, aid, tags_select } = editFolder;
     if (tags_select !== "") {
       const tagsResult = await dispatch(FETCH_TAGS_FAVORITE_UPDATE_THUNK({ type: "add", tags: tags_select })).unwrap();
@@ -146,6 +165,7 @@ const Desc = (props: any) => {
     } else {
       showSnackbar(t("comic.added_to_favorites_success"), "success");
     }
+    setMarkLoading(false);
     setEditFolder((prev: any) => ({ ...prev, ...defaultEditInitialState }));
   };
 
@@ -175,6 +195,7 @@ const Desc = (props: any) => {
 
   return (
     <>
+      {markLoading && <Loading />}
       <div className="p-3 w-full dark:text-tgy">
         <div className="w-full h-20 flex justify-around items-center text-gy py-1">
           <button
@@ -213,7 +234,7 @@ const Desc = (props: any) => {
               handleEngagementAction("mark", queryId);
             }}
           >
-            {detailList.is_favorite || favoriteSave.mark.includes(queryId) ? (
+            {favoriteSave.mark.includes(queryId) ? (
               <BookmarkIcon className="text-og" />
             ) : (
               <BookmarkBorderIcon className="text-2xl" />
@@ -365,7 +386,7 @@ const Desc = (props: any) => {
                     <div
                       onClick={() => {
                         navigate(`/comic/detail?id=${related.id}`);
-                        sessionStorage.setItem("relatedQuery", `/comic/detail?id=${queryId}`);
+                        sessionStorage.setItem("relatedQuery", queryId);
                       }}
                     >
                       <img
@@ -433,8 +454,9 @@ const Desc = (props: any) => {
       )}
       {dialogOpen.folder && (
         <FolderModal
+          markLoading={markLoading}
           folderList={favoriteList.folder_list}
-          tagsList={detailList.tags}
+          tagsList={[...(detailList.tags || []), ...(detailList.author ? detailList.author : [])]}
           dialogOpen={dialogOpen}
           setDialogOpen={setDialogOpen}
           editFolder={editFolder}

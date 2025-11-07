@@ -261,9 +261,7 @@ const BlogsDetail = () => {
                   <AdComponent adKey="app_blog_bottom_left_1" />
                   <AdComponent adKey="app_blog_bottom_right_1" />
                 </div>
-                <div className="max-h-[70px] overflow-hidden">
-                  <AdComponent adKey="app_blog_bottom_center" />
-                </div>
+                <AdComponent adKey="app_blog_bottom_center_jm3" />
                 <div className="grid grid-cols-2 h-full">
                   <AdComponent adKey="app_blog_bottom_left_2" />
                   <AdComponent adKey="app_blog_bottom_right_2" />
@@ -276,8 +274,8 @@ const BlogsDetail = () => {
           </>
         )}
       </div>
-      <div className="max-h-[70px] fixed bottom-0 left-0 right-0 z-20 bg-white">
-        <AdComponent adKey="app_blogs_fixed_bottom" closeBtn={true} />
+      <div className="fixed bottom-0 left-0 right-0 z-20">
+        <AdComponent adKey="app_blog_fixed_bottom_jm3" closeBtn={true} />
       </div>
       <PositionedSnackbar setSnackbars={setSnackbars} snackbars={snackbars} />
       {share && <Share share={share} setShare={setShare} setting={setting} queryId={queryId} type={"blog"} />}

@@ -31,7 +31,7 @@ const MoviesContent: React.FC<ContentProps> = ({ movie }) => {
             {(index + 1) % 10 === 1 && index !== 0 && (
               <div className="col-span-2 flex justify-center">
                 <div className="min-h-[70px] w-full bg-white">
-                  <AdComponent key={index + 1 * 10} adKey="app_movies_ten" />
+                  <AdComponent key={index + 1 * 10} adKey="app_movies_ten_jm3" />
                 </div>
               </div>
             )}
@@ -62,7 +62,7 @@ const MoviesContent: React.FC<ContentProps> = ({ movie }) => {
         ))}
       </div>
       <div className="mb-4 flex justify-center w-full">
-        <AdComponent key={1} adKey="app_movies_bottom" />
+        <AdComponent adKey="app_movies_bottom" />
       </div>
     </>
   );

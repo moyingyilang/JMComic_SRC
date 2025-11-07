@@ -84,9 +84,9 @@ const Blogs = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="h-full">
       {isBlogLoading && <Loading />}
-      <div className="sticky top-0 w-full h-20 bg-bbk text-white  flex justify-between items-center px-3 z-10">
+      <div className="sticky top-safe w-full h-20 bg-bbk text-white  flex justify-between items-center px-3 z-10">
         <GoBack back={sessionStorage.getItem("fromPage") || "/"} />
         <div className="top-bar-icon flex items-center space-x-4">
           {Array.isArray(tabItems) &&
@@ -151,8 +151,8 @@ const Blogs = () => {
           )}
         </PullToRefreshify>
         <TopBtn />
-        <div className={`fixed ${adResize ? "bottom-[-3rem]" : "bottom-[-1rem]"} left-0 right-0 bg-white`}>
-          <AdComponent key={1} adKey="app_blogs_fixed_bottom" closeBtn={true} handleAdResize={handleAdResize} />
+        <div className={`fixed ${adResize ? "bottom-[-3rem]" : "bottom-0"} left-0 right-0 bg-white`}>
+          <AdComponent key={1} adKey="app_blogs_fixed_bottom_jm3" closeBtn={true} handleAdResize={handleAdResize} />
         </div>
       </div>
     </div>

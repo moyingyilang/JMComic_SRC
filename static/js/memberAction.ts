@@ -515,6 +515,31 @@ export const FETCH_GET_WATCH_LIST_THUNK = createAsyncThunk(
     }
 );
 
+export const FETCH_WATCH_LIST_THUNK = createAsyncThunk(
+    "watchListUpdate/fetch",
+    async (id: number, { dispatch, rejectWithValue }) => {
+        try {
+            let res: Record<string, any> = {};
+
+            const url = getApiEndpoint("API_HISTORY_LIST");
+
+            await HttpUtil.fetchPost(url, { id },
+                (response: any) => {
+                    if (response.code === 200) {
+                        res = response.data;
+                    }
+                },
+                (error: any) => {
+                    return new Error(error);
+                }
+            );
+            return res;
+        } catch (error) {
+            return rejectWithValue(error instanceof Error ? error.message : "數據獲取失敗");
+        }
+    }
+);
+
 // 使用者編輯
 export const FETCH_GET_INFO_LIST_THUNK = createAsyncThunk(
     "getInfoList/fetch",

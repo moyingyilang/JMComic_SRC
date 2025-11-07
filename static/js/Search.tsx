@@ -57,14 +57,22 @@ const Search = () => {
   const { ref, inView } = useInView();
   const pageLimit = searchList.list?.length > 0 ? Math.ceil(searchList.total / 80) : 0;
   const hasNextPage = page <= pageLimit && pageLimit > 1;
-  const searchInitialState = {
-    start: false,
-    query: "",
-    selected: "成人A漫",
-    sort: searchSort[0],
-  };
+  const searchInitialState = { start: false, query: "", selected: "成人A漫", sort: searchSort[0] };
   const [searchConfig, setSearchConfig] = useState(searchInitialState);
   const [editFolder, setEditFolder] = useState(defaultEditInitialState);
+
+  // sort
+  useEffect(() => {
+    const storedSortTitle = sessionStorage.getItem("searchSort");
+
+    if (!storedSortTitle) return;
+
+    const matchedSort = searchSort.find((sortOption) => sortOption.title === storedSortTitle);
+
+    if (matchedSort) {
+      setSearchConfig((prevConfig) => ({ ...prevConfig, sort: matchedSort }));
+    }
+  }, []);
 
   const loadList = useCallback(
     (
@@ -176,6 +184,7 @@ const Search = () => {
     dispatch(CLEAR_SEARCH_LIST("searchList"));
     navigate(`/search`);
     sessionStorage.removeItem("searchQuery");
+    sessionStorage.removeItem("searchSort");
     setSearchConfig((prev: any) => ({ ...prev, ...searchInitialState }));
   };
 
@@ -191,14 +200,14 @@ const Search = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="h-full">
       {isLoading && searchConfig.start && <Loading />}
       <div className="w-full bg-og text-white flex justify-between p-2">
         <div className="flex items-center w-1/12" onClick={backPath}>
           <ArrowBackIosNewIcon sx={{ stroke: "white", strokeWidth: 2 }} />
         </div>
         <div className="flex flex-wrap items-start w-11/12 m-2 flex-col">
-          <div className="relative w-full">
+          <div className="relative w-full mt-6">
             <input
               ref={inputRef}
               type="text"
@@ -268,7 +277,7 @@ const Search = () => {
                 className="ml-auto border-[1px] border-solid border-og py-1 px-1 rounded-md flex items-center dark:bg-nbk"
                 onClick={() => setDialogOpen({ ...dialogOpen, search: true })}
               >
-                {searchConfig.sort.title}
+                {sessionStorage.getItem("searchSort") || searchConfig.sort.title}
                 <ArrowDropDownIcon />
               </button>
             </div>
@@ -388,7 +397,7 @@ const Search = () => {
               </p>
             </Link>
           </div>
-          <AdComponent adKey="app_search_bottom" />
+          <AdComponent adKey="app_search_bottom_jm3" />
         </div>
       )}
       <TopBtn />

@@ -10,7 +10,8 @@ export const usePWAProtection = () => {
   const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || hasCheckedRef.current) return;
+    if (process.env.NODE_ENV !== "production" || window.location.href.includes("devapp") || hasCheckedRef.current)
+      return;
     hasCheckedRef.current = true;
 
     const isInStandaloneMode = () => {
@@ -35,7 +36,7 @@ export const useDevtoolsBlocker = () => {
   const hasBlockedRef = useRef(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    if (process.env.NODE_ENV !== "production" || window.location.href.includes("devapp")) return;
 
     const threshold = 160;
     let checkInterval: NodeJS.Timeout;
@@ -74,7 +75,7 @@ export const useDevtoolsBlocker = () => {
     checkInterval = setInterval(() => {
       detectDevtools();
       checkByConsoleTiming();
-    }, 2000); // 每 2 秒偵測一次
+    }, 30000); // 每 30 秒偵測一次
 
     return () => {
       clearInterval(checkInterval);

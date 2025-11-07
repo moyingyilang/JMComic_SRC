@@ -1,8 +1,8 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = "offline-cache-v2.0.2";
-const OFFLINE_URL = "/offline.html?v=2.0.2";
-const FALLBACK_IMAGE = "/images/cover_default.jpg?v=2.0.2";
+const CACHE_NAME = "offline-cache-v2.0.9";
+const OFFLINE_URL = "/offline.html?v=2.0.9";
+const FALLBACK_IMAGE = "/images/cover_default.jpg?v=2.0.9";
 const PRECACHE_URLS = [OFFLINE_URL, FALLBACK_IMAGE];
 
 self.addEventListener("install", (event) => {

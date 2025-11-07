@@ -11,12 +11,17 @@ import { useTranslation } from "react-i18next";
 import AdComponent from "../Ads/AdComponent";
 import { CLEAR_CATEGORIES_LIST } from "../../reducers/categoriesReducer";
 import AodIcon from "@mui/icons-material/Aod";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { getRandomItems } from "../../utils/Function";
 
 const Banner = (props: any) => {
   const { dispatch, bannerList } = props;
   const { t } = useTranslation();
   const [isSwiping, setIsSwiping] = useState(false);
+
+  const bannerRandomIndex = useMemo(() => {
+    return getRandomItems(bannerList, bannerList?.length).indexes;
+  }, [bannerList]);
 
   const clearCatList = () => {
     dispatch(CLEAR_CATEGORIES_LIST("cateFilterList"));
@@ -67,9 +72,9 @@ const Banner = (props: any) => {
         onTouchEnd={() => setTimeout(() => setIsSwiping(false), 100)}
         className="mySwiper h-[250px]"
       >
-        {bannerList?.length > 0 &&
-          bannerList.map((item: any, index: number) => (
-            <SwiperSlide key={index}>
+        {bannerRandomIndex?.length > 0 &&
+          bannerRandomIndex.map((itemIndex: any) => (
+            <SwiperSlide key={itemIndex}>
               <div className="relative">
                 <div
                   className="absolute inset-0 z-10"
@@ -79,7 +84,7 @@ const Banner = (props: any) => {
                     backgroundColor: "transparent",
                   }}
                 />
-                <AdComponent adKey="app_home_top" adIndex={index} />
+                <AdComponent adKey="app_home_top" adIndex={itemIndex} />
               </div>
             </SwiperSlide>
           ))}

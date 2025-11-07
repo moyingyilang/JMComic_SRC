@@ -56,7 +56,8 @@ export const GlobalConfigProvider = ({ children }: any) => {
     const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || defaultConfig.memberInfo;
     const logined = localStorage.getItem("jwttoken") !== null;
     const host = localStorage.getItem("apiUrl") || "";
-    return { ...defaultConfig, host, imgSource, memberInfo, logined };
+    const ads = JSON.parse(localStorage.getItem("adsList") as string) || {};
+    return { ...defaultConfig, ads, host, imgSource, memberInfo, logined };
   });
 
   const savedDarkMode = localStorage.getItem("darkMode");
@@ -81,20 +82,15 @@ export const GlobalConfigProvider = ({ children }: any) => {
 
       if (result.code === 200) {
         setConfig((prev) => ({ ...prev, logined: true }));
-      } else {
-        setConfig((prev) => ({ ...prev, logined: false }));
       }
     } catch (err) {
-      console.error("自動登入失敗：", err);
       setConfig((prev) => ({ ...prev, logined: false }));
     }
   }, [dispatch, memberAccount]);
 
   // // ✅ 自動判斷登入狀態
   useEffect(() => {
-    if (config.logined) return;
-
-    if (memberAccount && Object.keys(memberAccount).length > 0) {
+    if (!config.logined && memberAccount && Object.keys(memberAccount).length > 0) {
       login();
     }
   }, [config.logined, memberAccount]);
@@ -124,17 +120,26 @@ export const GlobalConfigProvider = ({ children }: any) => {
   }, []);
 
   useEffect(() => {
-    const { hostReady, host, setting } = config;
-    if (!hostReady && host === "" && Object.keys(setting).length === 0) {
+    const { hostReady, host, setting, ads } = config;
+    const oldAdsCache = localStorage.getItem("oldAdsCache") || "";
+    if (
+      (!hostReady && host === "" && Object.keys(setting).length === 0) ||
+      (Object.keys(ads)?.length !== 0 && setting.ad_cache_version === Number(oldAdsCache))
+    ) {
       return;
     }
     const getAds = async () => {
       if (hostReady && setting.ipcountry) {
         const ipcountry = setting.ipcountry;
+        const adsLang = config.setting?.is_cn === 0 ? "TW" : "CN";
 
-        const data = await dispatch(FETCH_ALL_ADS_THUNK({ lang, ipcountry, v: setting.ad_cache_version })).unwrap();
+        const data = await dispatch(
+          FETCH_ALL_ADS_THUNK({ lang: adsLang, ipcountry, v: setting.ad_cache_version })
+        ).unwrap();
         if (data) {
           setConfig((prev) => ({ ...prev, ads: data }));
+          localStorage.setItem("adsList", JSON.stringify(data));
+          localStorage.setItem("oldAdsCache", setting.ad_cache_version);
         }
       }
     };

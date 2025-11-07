@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useGlobalConfig } from "../../GlobalContext";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { useTranslation } from "react-i18next";
@@ -18,9 +18,13 @@ const Library = () => {
   const { setting } = config;
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const filterQuery = sessionStorage.getItem("libQuery") || "";
   const libTab = sessionStorage.getItem("lib");
-  const [searchConfig, setSearchConfig] = useState({ query: "", tab: Number(libTab) || 1, page: 1 });
-  const [filter, setFilter] = useState<any>({ language: "", source: "" });
+  const libSource = sessionStorage.getItem("libSource") || "";
+  const searchInitialState = { start: false, query: filterQuery, tab: Number(libTab) || 1, page: 1 };
+  const [searchConfig, setSearchConfig] = useState(searchInitialState);
+  const [filter, setFilter] = useState<any>({ start: false, language: "", source: libSource });
   const { creatorAuthorList, creatorWorkList, isLoading, isLoadMore } = useAppSelector((state) => state.creator);
 
   const currentTab = searchConfig.tab === 1 ? creatorAuthorList : creatorWorkList;
@@ -33,11 +37,12 @@ const Library = () => {
     isRefreshing: boolean = false,
     page: number = searchConfig.page,
     query: string = searchConfig.query,
-    tab: number = searchConfig.tab
+    tab: number = searchConfig.tab,
+    time: number = 1000
   ) => {
     if (isRefreshing) {
       sessionStorage.setItem("catLoadMore", "1");
-      setSearchConfig({ ...searchConfig, query, tab, page: 1 });
+      setSearchConfig({ ...searchConfig, start: false, query, tab, page: 1 });
       dispatch(CLEAR_CREATOR_LIST("creatorAuthorList"));
     }
     dispatch(LOAD_CREATOR_LIST({ isLoading: true, isLoadMore, isRefreshing }));
@@ -54,14 +59,36 @@ const Library = () => {
           })
         );
       }
+      if (query) {
+        sessionStorage.setItem("libQuery", query);
+        navigate(`/library?filter=${encodeURIComponent(query)}`);
+      } else {
+        sessionStorage.removeItem("libQuery");
+        setSearchConfig({ ...searchConfig, start: false, query: "", tab, page: page });
+        navigate(`/library`);
+      }
       sessionStorage.setItem("libLoadMore", String(page));
-    }, 500);
+      sessionStorage.setItem("libSource", filter.source);
+      setFilter({ ...filter, start: false });
+    }, time);
   };
+
+  // list
+  useEffect(() => {
+    if (
+      (searchConfig.tab === 1 && creatorAuthorList.list?.length === 0) ||
+      (searchConfig.tab === 2 && creatorWorkList.list?.length === 0)
+    ) {
+      loadList();
+    }
+  }, [creatorAuthorList.list?.length, creatorWorkList.list?.length]);
 
   // lang & source
   useEffect(() => {
-    loadList();
-  }, [filter]);
+    if (filter.start) {
+      loadList();
+    }
+  }, [filter.start]);
 
   // loading more
   const handleLoadMore = () => {
@@ -81,7 +108,7 @@ const Library = () => {
   return (
     <>
       {isLoading && <Loading />}
-      <div className="sticky top-0 h-20 bg-bbk text-white flex items-end p-2 py-3 z-50">
+      <div className="sticky top-safe h-20 bg-bbk text-white flex items-end p-2 py-3 z-50">
         <GoBack back={sessionStorage.getItem("fromPage") || "/"} />
         <p className="ml-4 text-2xl text-og">{t("library.forbidden_comic_library")}</p>
       </div>

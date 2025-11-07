@@ -75,7 +75,7 @@ const Member = () => {
   const handleRefresh = async () => {
     loadInfoData();
     setInfoData({});
-    clearAuth();
+    clearAuth(setConfig);
     if (!isInfoLoading && !isInfoRefreshing) {
       const result = await dispatch(
         FETCH_LOGIN_THUNK({
@@ -135,12 +135,13 @@ const Member = () => {
   }, []);
 
   useEffect(() => {
-    scrollToTop();
     if (logined) {
       if (tab === 0 && unreadCount > 0) {
         setTab(3);
       }
       setInfoData(memberInfo);
+    } else {
+      scrollToTop();
     }
   }, [logined]);
 

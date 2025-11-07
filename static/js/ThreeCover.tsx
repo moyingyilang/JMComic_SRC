@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination } from "swiper/modules";
 import { useTranslation } from "react-i18next";
@@ -11,11 +11,15 @@ const ThreePlate = (props: any) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const { coverAds, isLoading } = useAppSelector((state) => state.main);
-  const coverLinks = coverAds.link?.exchange_link;
-  const coverImgs = coverAds.img;
+  const [adsLoading, setAdsLoading] = useState(true);
+  const adsContent = localStorage.getItem("adsContent");
+  const adsContentData = adsContent ? JSON.parse(adsContent) : Object.keys(coverAds || {}).length > 0 ? coverAds : {};
+  const coverLinks = adsContentData.link?.exchange_link;
+  const coverImgs = adsContentData.img;
   const LinksAdd = coverLinks ? coverLinks.show_max - coverLinks.first_links?.length : 1;
   const { items: secondRandomItem } = getRandomItems(coverLinks?.second_links, LinksAdd);
   const allLinks = [...(coverLinks?.first_links || []), ...secondRandomItem];
+  const fetchHost = localStorage.getItem("fetchHost");
 
   const handleAction = () => {
     document.body.classList.add("fade");
@@ -26,11 +30,17 @@ const ThreePlate = (props: any) => {
     }, 400);
   };
 
+  useEffect(() => {
+    if (adsContent) {
+      setAdsLoading(false);
+    }
+  }, []);
+
   return (
     <>
-      <div className="w-full min-h-screen bg-[#545454] absolute left-0 top-0 z-50">
+      <div className="w-full h-full bg-[#545454] absolute left-0 top-0 z-50">
         <div className="w-9/12 h-[300px] mx-auto flex justify-center items-center mt-14 overflow-hidden">
-          {isLoading ? (
+          {adsLoading ? (
             <img src="/images/loading.gif" alt="loading" width="40px" />
           ) : (
             (coverImgs?.splash_top.advs || []).map((d: any) => (
@@ -74,7 +84,7 @@ const ThreePlate = (props: any) => {
             modules={[Autoplay, Pagination]}
             className="mySwiper"
           >
-            {isLoading ? (
+            {adsLoading ? (
               <img src="/images/loading.gif" alt="loading" width="40px" />
             ) : (
               (coverImgs?.pop1_list.advs || []).map((d: any) => (
@@ -130,7 +140,9 @@ const ThreePlate = (props: any) => {
         </div>
         <div className="fixed bottom-2 left-0 right-0 flex justify-between px-6 py-1 text-white">
           <span>© 2008-2025 禁漫天堂</span>
-          <span>JM v{config.version}</span>
+          <span>
+            JM v{config.version}（{fetchHost}）
+          </span>
         </div>
       </div>
     </>
