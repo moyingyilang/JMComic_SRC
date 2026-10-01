@@ -14,6 +14,7 @@ export const saveAuthData = (token: any, memberData: any) => {
   localStorage.setItem("jwttoken", JSON.stringify(token));
   localStorage.setItem("memberInfo", JSON.stringify(memberData));
   localStorage.setItem("authExpiry", expiryTime.toString());
+  window.dispatchEvent(new CustomEvent("authUpdated", { detail: { logined: true, memberInfo: memberData } }));
 };
 
 const checkAuthExpiry = (setConfig: React.Dispatch<React.SetStateAction<any>>) => {

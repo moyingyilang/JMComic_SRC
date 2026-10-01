@@ -1,12 +1,14 @@
-import { useEffect, useRef } from "react";
-import { useAppDispatch } from "../../store/hooks";
-import { FETCH_NOTIFICATIONS_UNREAD_THUNK, FETCH_TAGS_FAVORITE_LIST_THUNK } from "../../actions/memberAction";
 import { motion } from "framer-motion";
+import { useEffect, useRef } from "react";
+import { FETCH_NOTIFICATIONS_UNREAD_THUNK, FETCH_TAGS_FAVORITE_LIST_THUNK } from "../../actions/memberAction";
+import { useScrollToTop } from "../../Hooks";
 import { CLEAR_MEMBER_LIST, LOAD_MEMBER_LIST } from "../../reducers/memberReducer";
+import { useAppDispatch } from "../../store/hooks";
 
 const Tab = (props: any) => {
-  const { logined, tabItems, tab, setTab, unread, openIndex, notifResult } = props;
+  const { logined, tabItems, tab, setTab, unread, openIndex, notifResult, stickyTop = 0 } = props;
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
   const tabRefs = useRef<(HTMLUListElement | null)[]>([]);
   const tabContainerRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,7 @@ const Tab = (props: any) => {
         });
       }, 0);
     }
-  }, []);
+  }, [tab]);
 
   const loadList = (isLoadMore: boolean = false, isRefreshing: boolean = false) => {
     dispatch(LOAD_MEMBER_LIST({ isLoading: true, isLoadMore, isRefreshing }));
@@ -47,8 +49,8 @@ const Tab = (props: any) => {
     <>
       <nav
         ref={tabContainerRef}
-        className="bg-nbk sticky top-28 w-full mx-auto flex items-center overflow-x-auto whitespace-nowrap pt-4 px-3 z-50"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        className="bg-nbk sticky w-full mx-auto flex items-center overflow-x-auto whitespace-nowrap pt-4 px-3 z-50"
+        style={{ top: stickyTop, scrollbarWidth: "none", msOverflowStyle: "none", transition: "top 300ms ease-in-out" }}
       >
         {Array.isArray(tabItems) &&
           tabItems.map((d: any, i: number) => (
@@ -62,10 +64,11 @@ const Tab = (props: any) => {
                 onClick={() => {
                   setTab(i + 1);
                   sessionStorage.setItem("memberTab", JSON.stringify(i + 1));
+                  scrollToTop();
                 }}
               >
                 <span className="py-1">{d}</span>
-                {i === 2 && unread.comic_follow + unread.site_notice > 0 && (
+                {i === 3 && unread.comic_follow + unread.site_notice > 0 && (
                   <span className="bg-red-600 text-white rounded-full w-6 h-6 text-sm flex items-center justify-center">
                     {unread.comic_follow + unread.site_notice}
                   </span>

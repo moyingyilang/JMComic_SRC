@@ -161,13 +161,13 @@ const FolderModal = (props: any) => {
                         <CheckIcon sx={{ fontSize: 14, color: "#ff6f00", stroke: "#ff6f00", strokeWidth: 2 }} />
                       )}
                     </p>
-                    <span>收藏全部標籤</span>
+                    <span>{t("detail.favorite_all_tags")}</span>
                   </div>
-                  <div className="flex flex-wrap items-center text-gy mt-4 dark:text-tgy">
+                  <div className="flex flex-wrap items-center text-gy mt-4 dark:text-gy">
                     {tagsList.map((d: any) => (
                       <span
                         key={d}
-                        className={`border-[1px] border-solid border-gy rounded-md p-1 m-1 dark:bg-nbk
+                        className={`border-[1px] border-solid border-gy rounded-md p-1 m-1
                          ${editFolder.tags_select?.split(",").includes(d) ? "bg-og text-white border-og" : ""}`}
                         onClick={() => {
                           const selectArray = editFolder.tags_select?.split(",") || [];

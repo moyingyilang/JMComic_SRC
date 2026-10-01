@@ -1,8 +1,8 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { RootState } from "../store";
-import HttpUtil from "../api/HttpUtil";
-import { GET_GAMES_LIST, APPEND_GAMES_LIST } from "../reducers/gamesReducer";
 import { getApiEndpoint } from "../api/ApiEndpointUtil";
+import HttpUtil from "../api/HttpUtil";
+import { APPEND_GAMES_LIST, GET_GAMES_LIST } from "../reducers/gamesReducer";
+import { RootState } from "../store";
 
 export const FETCH_CATEGORIES_THUNK = createAsyncThunk(
     "games/fetchCategories",

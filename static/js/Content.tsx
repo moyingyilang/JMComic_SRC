@@ -10,9 +10,10 @@ const BASE_URL = GlobalStore.apiUrl || "";
 interface ContentProps {
   movie: List[];
   videoType: string;
+  memberInfo: Record<string, any>;
 }
 
-const MoviesContent: React.FC<ContentProps> = ({ movie }) => {
+const MoviesContent: React.FC<ContentProps> = ({ movie, memberInfo }) => {
   const navigate = useNavigate();
 
   const { selectedVideoType, selectedSearchQuery } = useAppSelector((state) => state.movies);
@@ -28,10 +29,10 @@ const MoviesContent: React.FC<ContentProps> = ({ movie }) => {
       <div className="grid grid-cols-2 gap-2 p-2 ">
         {movie.map((item, index) => (
           <React.Fragment key={item.id + index}>
-            {(index + 1) % 10 === 1 && index !== 0 && (
+            {!memberInfo.ad_free && (index + 1) % 10 === 1 && index !== 0 && (
               <div className="col-span-2 flex justify-center">
                 <div className="min-h-[70px] w-full bg-white">
-                  <AdComponent key={index + 1 * 10} adKey="app_movies_ten_jm3" />
+                  <AdComponent adKey="app_movies_ten_jm3" />
                 </div>
               </div>
             )}
@@ -39,22 +40,35 @@ const MoviesContent: React.FC<ContentProps> = ({ movie }) => {
               onClick={() => handleGoToPlayer(item.id)}
               className="bg-white dark:bg-nbk rounded overflow-hidden shadow cursor-pointer"
             >
-              <div className="aspect-[16/9] overflow-hidden">
-                <LazyLoadImage
-                  className="w-full h-full object-cover"
-                  placeholderSrc="/images/title-circle.webp"
-                  src={item.photo.startsWith("http") ? item.photo : `${BASE_URL}${item.photo}`}
-                  alt={item.title}
-                />
-              </div>
+              {selectedVideoType === "movie" ? (
+                <div className="relative aspect-[2/3] w-full overflow-hidden">
+                  <LazyLoadImage
+                    className="absolute inset-0 w-full h-full object-cover"
+                    placeholderSrc="/images/cover_default.jpg"
+                    src={item.photo_str?.startsWith("http") ? item.photo_str : `${BASE_URL}${item.photo_str}`}
+                    alt={item.title}
+                  />
+                </div>
+              ) : (
+                <div className="relative aspect-[16/9] w-full overflow-hidden">
+                  <LazyLoadImage
+                    className="absolute inset-0 w-full h-full object-cover"
+                    placeholderSrc="/images/title-circle.webp"
+                    src={item.photo?.startsWith("http") ? item.photo : `${BASE_URL}${item.photo}`}
+                    alt={item.title}
+                  />
+                </div>
+              )}
               <div className="p-2">
-                <p className="line-clamp-1 text-sm font-medium dark:text-white">{item.title}</p>
-                <div className="text-xs text-og whitespace-nowrap overflow-auto scrollbar-hidden">
-                  {item.tags?.map((tag, idx) => (
+                <p className="line-clamp-2 text-base font-medium dark:text-white leading-6 min-h-[3rem]">
+                  {item.title}
+                </p>
+                <div className="text-sm text-og whitespace-nowrap overflow-auto scrollbar-hidden truncate">
+                  {/* {item.tags?.map((tag, idx) => (
                     <span key={idx} className="mr-1">
                       #{tag}
                     </span>
-                  ))}
+                  ))} */}
                 </div>
               </div>
             </div>

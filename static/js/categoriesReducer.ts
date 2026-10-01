@@ -54,6 +54,8 @@ const categoriesSlice = createSlice({
 
             if (Array.isArray(target)) {
                 target.length = 0;
+            } else if (target && Array.isArray((target as any).list)) {
+                (target as any).list.length = 0;
             } else if (target && typeof target === 'object') {
                 Object.keys(target).forEach(key => {
                     delete (target as Record<string, any>)[key];

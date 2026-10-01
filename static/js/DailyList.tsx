@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import MenuItem from "@mui/material/MenuItem";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import Button from "@mui/material/Button";
-import Menu from "@mui/material/Menu";
 import Fade from "@mui/material/Fade";
-import { FETCH_GET_DAILY_OPTION_THUNK, FETCH_DAILY_LIST_FILTER_THUNK } from "../../actions/memberAction";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { FETCH_DAILY_LIST_FILTER_THUNK, FETCH_GET_DAILY_OPTION_THUNK } from "../../actions/memberAction";
 import { CLEAR_MEMBER_LIST } from "../../reducers/memberReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import DialogModal from "../Modal/DialogModal";
 
 const DailyList = (props: any) => {
@@ -16,7 +16,8 @@ const DailyList = (props: any) => {
   const { dailyOption, dailyFilter, isLoading } = useAppSelector((state) => state.member);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const month = new Date().getMonth() + 1;
-  const [select, setSelect] = useState({ filter: "2025", list: month, img: "" });
+  const year = new Date().getFullYear().toString();
+  const [select, setSelect] = useState({ filter: year, list: month, img: "" });
   const [dialogOpen, setDialogOpen] = useState({ dailyImg: false });
 
   useEffect(() => {
@@ -46,7 +47,7 @@ const DailyList = (props: any) => {
                 onClick={(e) => setAnchorEl(e.currentTarget)}
                 sx={{ color: "#aaa", fontSize: 15, paddingLeft: 0 }}
               >
-                <span className="pr-10">{select.filter || "2025"}</span>
+                <span className="pr-10">{select.filter || year}</span>
                 <ArrowDropDownIcon sx={{ color: "#ff6f00", fontSize: 24 }} />
               </Button>
               <Menu
@@ -80,7 +81,7 @@ const DailyList = (props: any) => {
                         {d.title}
                       </MenuItem>
                     ))
-                  : ["2024", "2025"].map((d) => (
+                  : [(Number(year) - 1).toString(), year].map((d) => (
                       <MenuItem
                         key={d}
                         onClick={() => {
@@ -95,7 +96,7 @@ const DailyList = (props: any) => {
               </Menu>
             </div>
           </div>
-          <Link to="/daily" state={{ from: "/member?tab=6" }} className="bg-og rounded text-white py-3 px-4">
+          <Link to="/daily" state={{ from: "/member?tab=8" }} className="bg-og rounded text-white py-3 px-4">
             {t("daily.start_this_month_check_in")}
           </Link>
         </div>
@@ -120,7 +121,7 @@ const DailyList = (props: any) => {
                       target.src = "/images/not_sign_yet.png";
                     }}
                     width="100%"
-                    className="max-h-[220px] object-cover object-top"
+                    className="h-[220px] object-cover object-top"
                     style={{
                       opacity: "0",
                       transition: "opacity 0.5s ease-in-out",
@@ -134,8 +135,9 @@ const DailyList = (props: any) => {
                   <img
                     src={`/images/not_sign_yet.png`}
                     alt={d.id}
+                    loading="lazy"
                     width="100%"
-                    className="max-h-[220px] object-contain"
+                    className="h-[220px] object-contain"
                   />
                 )}
               </li>

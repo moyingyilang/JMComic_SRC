@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import CasinoIcon from "@mui/icons-material/Casino";
-import LocalCafeIcon from "@mui/icons-material/LocalCafe";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
+import CasinoIcon from "@mui/icons-material/Casino";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import LocalCafeIcon from "@mui/icons-material/LocalCafe";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useScrollToTop } from "../../Hooks";
 import AdComponent from "../Ads/AdComponent";
 
@@ -47,9 +47,9 @@ const MainTopBtn = (props: any) => {
       ) : (
         <>
           <button className="w-14 h-14 rounded-full fixed bottom-[18rem] right-3 bg-og text-white z-40">
-            <a href={setting.donate_url} target="_blank" rel="noreferrer">
+            <Link to="/pay?utm_source=platform&utm_medium=app_coffeicon">
               <LocalCafeIcon />
-            </a>
+            </Link>
           </button>
           <Link to="/daily" state={{ from: "/" }}>
             <button className="w-14 h-14 rounded-full fixed bottom-[14rem] right-3 bg-og text-white z-40">

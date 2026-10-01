@@ -1,66 +1,79 @@
-import { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import SendIcon from "@mui/icons-material/Send";
-import Loading from "../../components/Common/Loading";
-import RelatedListCarousel from "../../components/Blogs/RelatedListCarousel";
-import RelatedComicCarousel from "../../components/Blogs/RelatedComicCarousel";
-import ForumList from "../../components/Forum/ForumList";
-import Share from "../../components/Comic/Share";
-import DialogModal from "../../components/Modal/DialogModal";
-import MemberModal from "../../components/Modal/MemberModal";
-import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
-import { FETCH_FORUM_THUNK, FETCH_FORUM_SEND_THUNK } from "../../actions/forumAction";
-import { FETCH_ADD_LIKE_THUNK } from "../../actions/memberAction";
-import { FETCH_BLOGS_INFO_THUNK } from "../../actions/blogsAction";
-import { CLEAR_FORUM_LIST, LOAD_FORUM_LIST } from "../../reducers/forumReducer";
-import { defaultUserFormData } from "../../utils/InterFace";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
+import { useGlobalConfig } from "../../GlobalContext";
 import { GoBack } from "../../Hooks";
+import { FETCH_BLOGS_INFO_THUNK } from "../../actions/blogsAction";
+import { FETCH_FORUM_SEND_THUNK, FETCH_FORUM_THUNK } from "../../actions/forumAction";
+import { FETCH_ADD_LIKE_THUNK } from "../../actions/memberAction";
 import AdComponent from "../../components/Ads/AdComponent";
+import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import RelatedComicCarousel from "../../components/Blogs/RelatedComicCarousel";
+import RelatedListCarousel from "../../components/Blogs/RelatedListCarousel";
+import Share from "../../components/Comic/Share";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
+import ForumList from "../../components/Forum/ForumList";
+import MemberModal from "../../components/Modal/MemberModal";
+import NewTopicModal from "../../components/Modal/NewTopicModal";
 import { CLEAR_BLOG_STATE } from "../../reducers/blogsReducer";
+import { CLEAR_FORUM_LIST, LOAD_FORUM_LIST } from "../../reducers/forumReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { defaultUserFormData } from "../../utils/InterFace";
 
 const BlogsDetail = () => {
   const { config, setConfig } = useGlobalConfig();
-  const { setting, logined } = config;
+  const { setting, logined, memberInfo } = config;
   const { t } = useTranslation();
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
   const dispatch = useAppDispatch();
   const { blogsInfo, isBlogLoading } = useAppSelector((state) => state.blogs);
   const { forumList, isLoading } = useAppSelector((state) => state.forum);
   const [dialogOpen, setDialogOpen] = useState({ login: false, signUp: false, forgot: false, newTopic: false });
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("blogsCommentsLoadMore")) || 1);
   const [share, setShare] = useState(false);
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const queryId = searchParams.get("id") as string;
   const queryTab = searchParams.get("tab") as string;
   const targetRef = useRef<HTMLDivElement | null>(null);
-  const [responds, setResponds] = useState({ newTopic: "", spoilers: false, reply: "", activeIndex: null });
+  const [responds, setResponds] = useState({
+    newTopic: "",
+    spoilers: false,
+    reply: "",
+    activeIndex: null,
+    recommendBN_input: "",
+    recommendBN: [],
+    recommendBN_empty: false,
+    recommendBN_exceed: false,
+  });
   const [formData, setFormData] = useState(defaultUserFormData);
-  const pageLimit = forumList.list?.length ? Math.ceil(forumList.total / 5) : 0;
-  const hasNextPage = page < pageLimit && pageLimit > 1;
   const isBlogsLikedItem = JSON.parse(localStorage.getItem("blogLikedItems") || "[]");
 
-  const loadList = (
-    isLoadMore: boolean = false,
-    isRefreshing: boolean = false,
-    time: number = 0,
-    page: number = 1,
-    bid: string = queryId,
-    mode: string = "blog"
-  ) => {
-    dispatch(LOAD_FORUM_LIST({ isLoading: true, isLoadMore, isRefreshing }));
-    if (!isLoadMore) {
-      setPage(1);
-      dispatch(CLEAR_FORUM_LIST("forumList"));
-    }
-    setTimeout(() => {
-      dispatch(FETCH_FORUM_THUNK({ mode, page, bid }));
-    }, time);
-  };
+  const loadList = useCallback(
+    (
+      isLoadMore: boolean = false,
+      isRefreshing: boolean = false,
+      mode: string = "blog",
+      time: number = 0,
+      page: number = 1,
+      bid: string = queryId
+    ) => {
+      dispatch(LOAD_FORUM_LIST({ isLoading: true, isLoadMore, isRefreshing }));
+      if (isRefreshing) {
+        setPage(1);
+        dispatch(CLEAR_FORUM_LIST("forumList"));
+        sessionStorage.setItem("blogsCommentsLoadMore", "1");
+      }
+
+      setTimeout(() => {
+        dispatch(FETCH_FORUM_THUNK({ mode, page, bid }));
+      }, time);
+    },
+    [dispatch, queryId]
+  );
 
   const handleClick = () => {
     if (targetRef.current) {
@@ -77,6 +90,8 @@ const BlogsDetail = () => {
         top: 0,
         behavior: "smooth",
       });
+      setPage(1);
+      sessionStorage.setItem("blogsCommentsLoadMore", "1");
       loadList();
       if (queryTab) {
         dispatch(CLEAR_BLOG_STATE("blogsInfo"));
@@ -84,12 +99,6 @@ const BlogsDetail = () => {
       }
     }
   }, [dispatch, queryId, queryTab]);
-
-  const handleLoadMore = (nextPage: number) => {
-    if (!hasNextPage) return;
-    setPage(nextPage);
-    loadList(true, false, 1000, nextPage);
-  };
 
   useEffect(() => {
     if (!blogsInfo?.info?.content) return;
@@ -122,6 +131,7 @@ const BlogsDetail = () => {
       const { msg, status } = result.data;
       const type = status !== "ok" ? "error" : "success";
       showSnackbar(msg, type);
+      loadList(false, true);
     }
   };
 
@@ -141,8 +151,9 @@ const BlogsDetail = () => {
     <div>
       {isBlogLoading && <Loading />}
       <div className="pb-40">
-        <div className="fixed top-0 left-0 right-0 bg-defaultBg z-50 dark:bg-nbk">
-          <div className=" w-full h-16 bg-bbk text-tgy flex justify-between items-center px-3">
+        <div className="sticky top-safe left-0 right-0 bg-defaultBg z-50 dark:bg-nbk">
+          <HeaderAds />
+          <div className=" w-full h-14 bg-bbk text-tgy flex justify-between items-center px-3">
             <div className="flex items-center">
               <GoBack back="/blogs" />
               <p className="ml-4 w-80 truncate">{blogsInfo?.info?.title}</p>
@@ -157,14 +168,15 @@ const BlogsDetail = () => {
               <div className="p-3">
                 <p>{blogsInfo.info?.title}</p>
                 <div className="mt-4 mb-2">
-                  <span className="bg-og text-tgy rounded p-2">
+                  <span className="bg-og text-white rounded p-2">
                     {queryTab === "1" ? t("blogs.night_bistro") : t("blogs.game_library")}
                   </span>
-                  {blogsInfo.info.tags[0].split(",").map((d: any) => (
-                    <span key={d} className="bg-tgy text-gy rounded p-2 ml-2">
-                      {d}
-                    </span>
-                  ))}
+                  {blogsInfo.info.tags[0] !== "" &&
+                    blogsInfo.info.tags[0].split(",").map((d: any) => (
+                      <span key={d} className="bg-tgy text-gy rounded p-2 ml-2">
+                        {d}
+                      </span>
+                    ))}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-0 text-gy text-center">
@@ -200,7 +212,7 @@ const BlogsDetail = () => {
               </div>
             </div>
             {blogsInfo.related_blogs?.length > 0 && (
-              <div ref={targetRef} className="bg-white mt-2 p-2 dark:bg-nbk">
+              <div className="bg-white mt-2 p-2 dark:bg-nbk">
                 <p className="m-2">{t("blogs.related_articles")}</p>
                 <RelatedListCarousel
                   t={t}
@@ -216,20 +228,28 @@ const BlogsDetail = () => {
                 <RelatedComicCarousel related_comics={blogsInfo.related_comics} setting={setting} />
               </div>
             )}
-            <div className="mt-4">
+            <div ref={targetRef} className="mt-4">
               <ForumList
                 t={t}
                 logined={logined}
                 setting={setting}
+                memberInfo={memberInfo}
                 list={forumList.list}
                 isLoading={isLoading}
                 dialogOpen={dialogOpen}
                 setDialogOpen={setDialogOpen}
                 responds={responds}
                 setResponds={setResponds}
-                handleSendRespond={handleSendRespond}
                 showReplySection={true}
-                hasNextPage={hasNextPage}
+                section="blogs_comments"
+                page={page}
+                setPage={setPage}
+                pageStorageKey="blogsCommentsLoadMore"
+                pageSize={5}
+                mode="blog"
+                scrollTarget={targetRef}
+                loadList={loadList}
+                showSnackbar={showSnackbar}
               />
               <div className="bg-bbk h-20 flex items-center justify-center mt-2">
                 <input
@@ -245,16 +265,6 @@ const BlogsDetail = () => {
                 <button className="rounded-full bg-og p-2 ml-2">
                   <SendIcon sx={{ color: "white", fontSize: 16, stroke: "white", strokeWidth: 1 }} />
                 </button>
-              </div>
-              <div className="flex justify-center mt-2">
-                {hasNextPage && (
-                  <button
-                    onClick={() => handleLoadMore(page + 1)}
-                    className="w-4/12 rounded-sm text-white p-2 my-4 bg-og shadow-lg shadow-stone-700/50"
-                  >
-                    {t("comic.click_to_load")}
-                  </button>
-                )}
               </div>
               <div className="mt-2">
                 <div className="grid grid-cols-2 h-full">
@@ -279,16 +289,6 @@ const BlogsDetail = () => {
       </div>
       <PositionedSnackbar setSnackbars={setSnackbars} snackbars={snackbars} />
       {share && <Share share={share} setShare={setShare} setting={setting} queryId={queryId} type={"blog"} />}
-      {dialogOpen.newTopic && (
-        <DialogModal
-          queryId={queryId}
-          setDialogOpen={setDialogOpen}
-          dialogOpen={dialogOpen}
-          responds={responds}
-          setResponds={setResponds}
-          handleSendRespond={handleSendRespond}
-        />
-      )}
       {(dialogOpen.login || dialogOpen.signUp || dialogOpen.forgot) && !logined && (
         <MemberModal
           setFormData={setFormData}
@@ -301,6 +301,16 @@ const BlogsDetail = () => {
           showSnackbar={showSnackbar}
         />
       )}
+      <NewTopicModal
+        open={dialogOpen.newTopic}
+        dialogOpen={dialogOpen}
+        setDialogOpen={setDialogOpen}
+        responds={responds}
+        setResponds={setResponds}
+        handleSendNewTopic={() => handleSendRespond(responds.newTopic, queryId)}
+        showSnackbar={showSnackbar}
+        queryId={queryId}
+      />
     </div>
   );
 };

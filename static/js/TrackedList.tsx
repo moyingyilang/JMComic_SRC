@@ -1,22 +1,28 @@
-import { useEffect, useState } from "react";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import ReplayIcon from "@mui/icons-material/Replay";
 import CircularProgress from "@mui/material/CircularProgress";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   FETCH_NOTIFICATIONS_TRACK_LIST_THUNK,
   FETCH_POST_NOTIFICATIONS_SERTRACK_THUNK,
 } from "../../actions/memberAction";
+import { useGlobalConfig } from "../../GlobalContext";
+import { useScrollToTop } from "../../Hooks";
 import { CLEAR_MEMBER_LIST, LOAD_MEMBER_LIST } from "../../reducers/memberReducer";
-import { Link } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { getDateDiffFromNow } from "../../utils/Function";
+import ClickPagination from "../Common/ClickPagination";
 
 const TrackedList = (props: any) => {
   const { t, logined, showSnackbar } = props;
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
+  const { config } = useGlobalConfig();
+  const { paginationMode } = config;
   const { trackedList, isLoading, isRefreshing } = useAppSelector((state) => state.member);
-  const [page, setPage] = useState(1);
-  const pageLimit = trackedList.list?.length > 0 ? Math.ceil(trackedList.total / 20) : 0;
-  const hasNextPage = page <= pageLimit && pageLimit > 1;
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("trackedLoadMore")) || 1);
+  const pageLimit = trackedList.total > 0 ? Math.ceil(trackedList.total / 20) : 1;
+  const hasNextPage = page < pageLimit && pageLimit > 1;
 
   const loadList = (isLoadMore: boolean = false, isRefreshing: boolean = false, time: number = 0, page: number = 1) => {
     dispatch(LOAD_MEMBER_LIST({ isLoading: true, isLoadMore, isRefreshing }));
@@ -24,19 +30,31 @@ const TrackedList = (props: any) => {
       setPage(1);
       dispatch(CLEAR_MEMBER_LIST("trackedList"));
     }
+    if (!isLoadMore) {
+      scrollToTop();
+    }
     setTimeout(() => {
       dispatch(FETCH_NOTIFICATIONS_TRACK_LIST_THUNK(page));
     }, time);
   };
 
   useEffect(() => {
-    if (logined && trackedList.list?.length === 0) loadList();
+    if (logined && !trackedList.list?.length) loadList();
   }, [logined, trackedList.list?.length]);
 
   //   loadMore
   const handleLoadMore = (nextPage: number) => {
     setPage(nextPage);
+    sessionStorage.setItem("trackedLoadMore", String(nextPage));
     loadList(true, false, 1000, nextPage);
+  };
+
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    setPage(targetPage);
+    sessionStorage.setItem("trackedLoadMore", String(targetPage));
+    loadList(false, false, 0, targetPage);
   };
 
   // Refresh
@@ -114,7 +132,9 @@ const TrackedList = (props: any) => {
         <div className="flex flex-col justify-center items-center pb-48">
           {isLoading && <img src="/images/loading.gif" alt="loading" width="80px" />}
           {trackedList.list?.length > 0 &&
-            (hasNextPage ? (
+            (paginationMode === "click" ? (
+              <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={isLoading} />
+            ) : hasNextPage ? (
               <button
                 onClick={() => handleLoadMore(page + 1)}
                 className="w-11/12 rounded-sm text-white p-2 bg-og shadow-lg shadow-stone-700/50"

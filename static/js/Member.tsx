@@ -1,35 +1,38 @@
-import { useState, useEffect, useRef } from "react";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import Tab from "../../components/Member/Tab";
-import CenterCard from "../../components/Member/CenterCard";
-import MarkList from "../../components/Member/MarkList";
-import TagMarkList from "../../components/Member/TagMarkList";
-import AchievementList from "../../components/Member/AchievementList";
-import DailyList from "../../components/Member/DailyList";
-import ReadList from "../../components/Member/ReadList";
-import CommentList from "../../components/Member/CommentList";
-import InfoList from "../../components/Member/InfoList";
-import SettingList from "../../components/Member/SettingList";
-import NotificationList from "../../components/Member/NotificationList";
-import TrackedList from "../../components/Member/TrackedList";
-import BottomNav from "../../components/Main/BottomNav";
-import MsgModal from "../../components/Modal/MsgModal";
-import MemberModal from "../../components/Modal/MemberModal";
-import { FETCH_CHARGE_THUNK, FETCH_AD_FREE_THUNK, FETCH_LOGIN_THUNK } from "../../actions/memberAction";
-import { CommonQData, MemberCardData } from "../../assets/JsonData";
-import { defaultUserFormData } from "../../utils/InterFace";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useGlobalConfig } from "../../GlobalContext";
 import { useScrollToTop } from "../../Hooks";
-import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
-import { LOAD_MEMBER_INFO_LIST } from "../../reducers/memberReducer";
-import Cookies from "js-cookie";
 import { clearAuth } from "../../Hooks/useAuth";
+import { FETCH_AD_FREE_THUNK, FETCH_CHARGE_THUNK, FETCH_LOGIN_THUNK } from "../../actions/memberAction";
+import { CommonQData, MemberCardData } from "../../assets/JsonData";
+import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import HeaderAds from "../../components/Common/HeaderAds";
+import BottomNav from "../../components/Main/BottomNav";
+import AchievementList from "../../components/Member/AchievementList";
+import CenterCard from "../../components/Member/CenterCard";
+import CommentList from "../../components/Member/CommentList";
+import DailyList from "../../components/Member/DailyList";
+import InfoList from "../../components/Member/InfoList";
+import MarkList from "../../components/Member/MarkList";
+import NotificationList from "../../components/Member/NotificationList";
+import NovelMarkList from "../../components/Member/NovelMarkList";
+import OrderRecordList from "../../components/Member/OrderRecordList";
+import ReadList from "../../components/Member/ReadList";
+import SettingList from "../../components/Member/SettingList";
+import Tab from "../../components/Member/Tab";
+import TagBlockSetting from "../../components/Member/TagBlockSetting";
+import TagMarkList from "../../components/Member/TagMarkList";
+import TrackedList from "../../components/Member/TrackedList";
+import MemberModal from "../../components/Modal/MemberModal";
+import MsgModal from "../../components/Modal/MsgModal";
+import { LOAD_MEMBER_INFO_LIST } from "../../reducers/memberReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { defaultUserFormData } from "../../utils/InterFace";
 
 const Member = () => {
   const { config, setConfig } = useGlobalConfig();
-  const { setting, logined } = config;
+  const { setting, logined, adsContent } = config;
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -52,6 +55,10 @@ const Member = () => {
   const [msgOpen, setMsgOpen] = useState({ member: false, invite: false, charge: false });
   const [scrollUp, setScrollUp] = useState(false);
   const [formData, setFormData] = useState(defaultUserFormData);
+  const headerAdsRef = useRef<HTMLDivElement>(null);
+  const [headerAdsHeight, setHeaderAdsHeight] = useState(0);
+  const CENTER_CARD_EXPANDED_HEIGHT = 110;
+  const centerCardStickyHeight = !logined || scrollUp ? CENTER_CARD_EXPANDED_HEIGHT : 0;
   const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string);
   const searchParams = new URLSearchParams(location.search);
   const initTab = logined ? 0 : 1;
@@ -76,55 +83,62 @@ const Member = () => {
     loadInfoData();
     setInfoData({});
     clearAuth(setConfig);
-    if (!isInfoLoading && !isInfoRefreshing) {
-      const result = await dispatch(
-        FETCH_LOGIN_THUNK({
-          username: memberAccount.username,
-          password: memberAccount.password,
-        })
-      ).unwrap();
-      if (result.code === 200) {
-        setTimeout(() => {
-          setInfoData(result.data);
-          loadInfoData(false, false);
-        }, 2000);
-      }
-    } else if (memberInfo) {
-      setInfoData(memberInfo);
+    const result = await dispatch(
+      FETCH_LOGIN_THUNK({
+        username: memberAccount.username,
+        password: memberAccount.password,
+      })
+    ).unwrap();
+    if (result.code === 200) {
+      setTimeout(() => {
+        setInfoData(result.data);
+        loadInfoData(false, false);
+      }, 1000);
     }
   };
 
+  const refreshSession = async () => {
+    if (!memberAccount) return;
+    localStorage.removeItem("jwttoken");
+    return await dispatch(
+      FETCH_LOGIN_THUNK({
+        username: memberAccount.username,
+        password: memberAccount.password,
+      })
+    ).unwrap();
+  };
+
   // coinCharge && AdFree
-  const handleChargeAdFree = async ({
-    coinCharge = false,
-    AdFree = false,
-    type = "",
-  }: {
-    coinCharge?: boolean;
-    AdFree?: boolean;
-    type?: string;
-  }) => {
-    if (coinCharge) {
-      const result = await dispatch(FETCH_CHARGE_THUNK()).unwrap();
-      if (result.data.status === "ok" && memberAccount) {
-        // 改變info狀態
-        localStorage.removeItem("jwttoken");
-        dispatch(FETCH_LOGIN_THUNK({ username: memberAccount.username, password: memberAccount.password }));
+  type ChargeAdFreeParams =
+    | { coinCharge: true; adFree?: never; type?: never }
+    | { coinCharge?: false; adFree: true; type: string };
+
+  const handleChargeAdFree = async (params: ChargeAdFreeParams) => {
+    try {
+      const result = params.coinCharge
+        ? await dispatch(FETCH_CHARGE_THUNK()).unwrap()
+        : await dispatch(FETCH_AD_FREE_THUNK({ type: params.type })).unwrap();
+
+      if (result.data.status === "ok") {
+        await refreshSession();
       }
-    } else if (AdFree && type !== "") {
-      const result = await dispatch(FETCH_AD_FREE_THUNK({ type })).unwrap();
-      if (result.data.status === "ok" && memberAccount) {
-        // 改變info狀態
-        localStorage.removeItem("jwttoken");
-        dispatch(FETCH_LOGIN_THUNK({ username: memberAccount.username, password: memberAccount.password }));
-      }
+    } catch (error) {
+      console.error("charge / ad-free 请求失败", error);
     }
   };
+
+  useEffect(() => {
+    const observer = new ResizeObserver(() => {
+      if (headerAdsRef.current) setHeaderAdsHeight(headerAdsRef.current.offsetHeight);
+    });
+    if (headerAdsRef.current) observer.observe(headerAdsRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   //滾動上方顯示個人資訊
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 30) {
+      if (window.scrollY > 80) {
         setScrollUp(true);
       } else {
         setScrollUp(false);
@@ -135,19 +149,79 @@ const Member = () => {
   }, []);
 
   useEffect(() => {
-    if (logined) {
-      if (tab === 0 && unreadCount > 0) {
-        setTab(3);
-      }
-      setInfoData(memberInfo);
-    } else {
+    if (!logined) {
       scrollToTop();
+      return;
     }
+    if (tab === 0) {
+      setTab(unreadCount > 0 ? 4 : 1);
+    }
+    setInfoData(memberInfo);
   }, [logined]);
+
+  const tabParam = searchParams.get("tab");
+  useEffect(() => {
+    if (tabParam === "4" && tab !== 4) {
+      setTab(4);
+    }
+  }, [tabParam, tab]);
+
+  // 順序需對應 member_card.tab_items（設定除外，見 isSettingsTab）
+  const tabPanels: Array<() => JSX.Element> = [
+    () => <MarkList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />,
+    () => <NovelMarkList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />,
+    () => <TagMarkList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />,
+    () => (
+      <NotificationList
+        t={t}
+        memberInfo={memberInfo}
+        unread={unread}
+        unreadCount={unreadCount}
+        setting={setting}
+        logined={logined}
+        showSnackbar={showSnackbar}
+        openIndex={openIndex}
+        setOpenIndex={setOpenIndex}
+      />
+    ),
+    () => (
+      <TrackedList
+        t={t}
+        unread={unread}
+        logined={logined}
+        showSnackbar={showSnackbar}
+        openIndex={openIndex}
+        setOpenIndex={setOpenIndex}
+      />
+    ),
+    // () => <SpeedTest />,
+    () => (
+      <TagBlockSetting t={t} setting={setting} logined={logined} memberInfo={memberInfo} showSnackbar={showSnackbar} />
+    ),
+    () => (
+      <AchievementList
+        t={t}
+        setConfig={setConfig}
+        setting={setting}
+        logined={logined}
+        memberInfo={memberInfo}
+        showSnackbar={showSnackbar}
+      />
+    ),
+    () => <DailyList t={t} setting={setting} logined={logined} memberInfo={memberInfo} showSnackbar={showSnackbar} />,
+    () => <OrderRecordList t={t} logined={logined} memberInfo={memberInfo} refreshSession={refreshSession} />,
+    () => <ReadList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />,
+    () => <CommentList t={t} setting={setting} logined={logined} memberInfo={memberInfo} showSnackbar={showSnackbar} />,
+    () => <InfoList t={t} setting={setting} logined={logined} memberInfo={memberInfo} showSnackbar={showSnackbar} />,
+  ];
+  const isSettingsTab = Array.isArray(tabItems) && tab === tabItems.length;
 
   return (
     <>
       <div className="w-full bg-nbk text-white">
+        <div ref={headerAdsRef} className="bg-nbk sticky top-safe flex flex-col z-40">
+          <HeaderAds />
+        </div>
         <CenterCard
           t={t}
           logined={logined}
@@ -163,6 +237,7 @@ const Member = () => {
           memberProgressMax={memberProgressMax}
           setMsgOpen={setMsgOpen}
           msgOpen={msgOpen}
+          stickyTop={headerAdsHeight - 1}
         />
         <Tab
           logined={logined}
@@ -172,73 +247,11 @@ const Member = () => {
           unread={unread}
           openIndex={openIndex}
           notifResult={notifResult}
+          stickyTop={headerAdsHeight + centerCardStickyHeight - 1}
         />
-        {tab !== 10 ? (
+        {!isSettingsTab ? (
           logined ? (
-            <div className="bg-defaultBg min-h-screen dark:bg-bk">
-              {tab === 1 && <MarkList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />}
-              {tab === 2 && <TagMarkList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />}
-              {tab === 3 && (
-                <NotificationList
-                  t={t}
-                  unread={unread}
-                  unreadCount={unreadCount}
-                  setting={setting}
-                  logined={logined}
-                  showSnackbar={showSnackbar}
-                  openIndex={openIndex}
-                  setOpenIndex={setOpenIndex}
-                />
-              )}
-              {tab === 4 && (
-                <TrackedList
-                  t={t}
-                  unread={unread}
-                  logined={logined}
-                  showSnackbar={showSnackbar}
-                  openIndex={openIndex}
-                  setOpenIndex={setOpenIndex}
-                />
-              )}
-              {tab === 5 && (
-                <AchievementList
-                  t={t}
-                  setConfig={setConfig}
-                  setting={setting}
-                  logined={logined}
-                  memberInfo={memberInfo}
-                  showSnackbar={showSnackbar}
-                />
-              )}
-              {tab === 6 && (
-                <DailyList
-                  t={t}
-                  setting={setting}
-                  logined={logined}
-                  memberInfo={memberInfo}
-                  showSnackbar={showSnackbar}
-                />
-              )}
-              {tab === 7 && <ReadList t={t} setting={setting} logined={logined} showSnackbar={showSnackbar} />}
-              {tab === 8 && (
-                <CommentList
-                  t={t}
-                  setting={setting}
-                  logined={logined}
-                  memberInfo={memberInfo}
-                  showSnackbar={showSnackbar}
-                />
-              )}
-              {tab === 9 && (
-                <InfoList
-                  t={t}
-                  setting={setting}
-                  logined={logined}
-                  memberInfo={memberInfo}
-                  showSnackbar={showSnackbar}
-                />
-              )}
-            </div>
+            <div className="bg-defaultBg min-h-screen dark:bg-bk">{tabPanels[tab - 1]?.()}</div>
           ) : (
             <div className="w-full bg-defaultBg text-bbk min-h-screen dark:bg-bbk dark:text-tgy">
               <div className="bg-white dark:bg-bbk flex justify-center items-center text-xl h-[400px]">
@@ -253,6 +266,7 @@ const Member = () => {
               i18n={i18n}
               setting={setting}
               setConfig={setConfig}
+              adsContent={adsContent}
               logined={logined}
               memberInfo={memberInfo}
               showSnackbar={showSnackbar}
@@ -264,6 +278,7 @@ const Member = () => {
       {msgOpen.member && <MsgModal t={t} content={CommonQ} msgOpen={msgOpen} setMsgOpen={setMsgOpen} />}
       {dialogOpen.invite && (
         <MemberModal
+          setConfig={setConfig}
           setDialogOpen={setDialogOpen}
           dialogOpen={dialogOpen}
           memberInfo={memberInfo}

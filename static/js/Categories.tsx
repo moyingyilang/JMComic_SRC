@@ -1,36 +1,39 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { PullToRefreshify } from "react-pull-to-refreshify";
-import { useInView } from "react-intersection-observer";
-import { useTranslation } from "react-i18next";
-import { motion } from "framer-motion";
-import CircularProgress from "@mui/material/CircularProgress";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
-import Header from "../../components/Common/Header";
-import BottomNav from "../../components/Main/BottomNav";
-import ComicList from "../../components/Common/ComicList";
-import Loading from "../../components/Common/Loading";
-import TopBtn from "../../components/Common/TopBtn";
-import MemberModal from "../../components/Modal/MemberModal";
+import CircularProgress from "@mui/material/CircularProgress";
+import { motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useInView } from "react-intersection-observer";
+import { PullToRefreshify } from "react-pull-to-refreshify";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FETCH_CATEGORIES_FILTER_LIST_THUNK, FETCH_CATEGORIES_LIST_THUNK } from "../../actions/categoriesAction";
 import { FETCH_TAGS_FAVORITE_LIST_THUNK } from "../../actions/memberAction";
 import { FETCH_HOT_TAGS_THUNK } from "../../actions/searchAction";
-import { CLEAR_CATEGORIES_LIST, LOAD_CATEGORIES_LIST } from "../../reducers/categoriesReducer";
-import { renderText } from "../../utils/Function";
 import { CatSortData } from "../../assets/JsonData";
-import { defaultEditInitialState, defaultUserFormData } from "../../utils/InterFace";
 import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import ClickPagination from "../../components/Common/ClickPagination";
+import ComicList from "../../components/Common/ComicList";
+import Header from "../../components/Common/Header";
+import Loading from "../../components/Common/Loading";
+import TopBtn from "../../components/Common/TopBtn";
+import BottomNav from "../../components/Main/BottomNav";
+import MemberModal from "../../components/Modal/MemberModal";
+import { useGlobalConfig } from "../../GlobalContext";
+import { useScrollToTop } from "../../Hooks";
+import { CLEAR_CATEGORIES_LIST, LOAD_CATEGORIES_LIST } from "../../reducers/categoriesReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { renderText } from "../../utils/Function";
+import { defaultEditInitialState, defaultUserFormData } from "../../utils/InterFace";
 
 const Categories = () => {
   const { config, setConfig } = useGlobalConfig();
-  const { setting, logined } = config;
+  const { setting, logined, paginationMode } = config;
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
   const { cateFilterList, categoriesList, isLoading, isRefreshing } = useAppSelector((state) => state.categories);
   const { tagsList } = useAppSelector((state) => state.member);
@@ -63,10 +66,10 @@ const Categories = () => {
     ranking: catSort,
   });
   const subList = catList.current.cat?.find((d: any) => d.slug === filter.slug)?.sub_categories || [];
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("catLoadMore")) || 1);
   const { ref, inView } = useInView();
-  const pageLimit = cateFilterList.list?.length ? Math.ceil(cateFilterList.total / 80) : 10;
-  const hasNextPage = page <= pageLimit;
+  const pageLimit = cateFilterList.total ? Math.ceil(cateFilterList.total / 80) : 1;
+  const hasNextPage = page < pageLimit && pageLimit > 1;
 
   useEffect(() => {
     sessionStorage.setItem("fromPage", `${location.pathname}?slug=${filter.slug}&sort=${filter.sort}`);
@@ -83,9 +86,12 @@ const Categories = () => {
     c: string = filter_slug
   ) => {
     if (isRefreshing) {
-      setPage(0);
-      sessionStorage.setItem("catLoadMore", "0");
+      setPage(1);
+      sessionStorage.setItem("catLoadMore", "1");
       dispatch(CLEAR_CATEGORIES_LIST("cateFilterList"));
+    }
+    if (!isLoadMore) {
+      scrollToTop();
     }
     dispatch(LOAD_CATEGORIES_LIST({ isLoading: true, isLoadMore, isRefreshing }));
     setTimeout(() => {
@@ -97,22 +103,30 @@ const Categories = () => {
 
   // 排序 預設最新 '' || 最多愛心 'tf' || 總排行 'mv' || 月排行 'mv_m' || 週排行 'mv_w' || 日排行 'mv_t'
   useEffect(() => {
-    if (filter.slug !== catTab || tabChange || cateFilterList.list?.length === 0) {
+    if (filter.slug !== catTab || tabChange || !cateFilterList.list?.length) {
+      setPage(1);
       loadList();
       sessionStorage.setItem("catTab", filter.slug);
     }
   }, [filter.slug, tabChange, cateFilterList.list?.length]);
 
   // header
+  const fetchedRef = useRef({ tags: false, categories: false, hotTags: false });
+
   useEffect(() => {
-    if (logined && tagsList.list?.length === 0) {
+    if (logined && !tagsList.list?.length && !fetchedRef.current.tags) {
+      fetchedRef.current.tags = true;
       dispatch(FETCH_TAGS_FAVORITE_LIST_THUNK());
     }
-    if (Object.keys(categoriesList).length === 0 && hotTagsList.length === 0) {
+    if (!Object.keys(categoriesList)?.length && !fetchedRef.current.categories) {
+      fetchedRef.current.categories = true;
       dispatch(FETCH_CATEGORIES_LIST_THUNK());
+    }
+    if (!hotTagsList?.length && !fetchedRef.current.hotTags) {
+      fetchedRef.current.hotTags = true;
       dispatch(FETCH_HOT_TAGS_THUNK());
     }
-  }, [dispatch, logined, Object.keys(categoriesList).length, hotTagsList.length]);
+  }, [dispatch, logined, tagsList.list?.length, Object.keys(categoriesList)?.length, hotTagsList?.length]);
 
   useEffect(() => {
     const catLists = catList.current;
@@ -143,6 +157,13 @@ const Categories = () => {
     loadMore();
   }, [loadMore]);
 
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    setPage(targetPage);
+    loadList(false, false, 0, targetPage);
+  };
+
   const handleMarkClick = () => {
     setMarkOpen(!markOpen);
     sessionStorage.setItem("markOpen", String(!markOpen));
@@ -151,7 +172,7 @@ const Categories = () => {
   return (
     <>
       {isLoading && <Loading />}
-      <div className="border-none h-full">
+      <div className="border-none h-full dark:bg-bk">
         <div className="sticky top-0 z-50 bg-white dark:bg-bk">
           <Header
             currentPage="categories"
@@ -251,16 +272,20 @@ const Categories = () => {
                   showSnackbar={showSnackbar}
                 />
               </div>
-              <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40">
-                {hasNextPage ? (
-                  <div className="flex items-center">
-                    <CircularProgress color="inherit" size={12} />
-                    <p className="ml-2">{t("comic.pull_to_load")}</p>
-                  </div>
-                ) : (
-                  <p className="text-center">{t("comic.no_more")}</p>
-                )}
-              </button>
+              {paginationMode === "click" ? (
+                <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={isLoading} />
+              ) : (
+                <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40">
+                  {hasNextPage ? (
+                    <div className="flex items-center">
+                      <CircularProgress color="inherit" size={12} />
+                      <p className="ml-2">{t("comic.pull_to_load")}</p>
+                    </div>
+                  ) : (
+                    <p className="text-center">{t("comic.no_more")}</p>
+                  )}
+                </button>
+              )}
             </>
           )}
         </PullToRefreshify>

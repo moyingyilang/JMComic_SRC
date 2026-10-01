@@ -5,7 +5,7 @@ import AdContainer from "../../components/Ads/AdsTest";
 import { useGlobalConfig } from "../../GlobalContext";
 
 const BlogsList = (props: any) => {
-  const { t, setting, list, tab, hasScrolled, isBlogLoading } = props;
+  const { t, setting, list, tab, hasScrolled, isBlogLoading, memberInfo } = props;
 
   const { config } = useGlobalConfig();
   const { ads } = config;
@@ -15,7 +15,7 @@ const BlogsList = (props: any) => {
         list.length > 0 &&
         list.map((d, i) => (
           <div key={i}>
-            {i > 0 && i % 10 === 0 && (
+            {!memberInfo.ad_free && i > 0 && i % 10 === 0 && (
               <div className="bg-white m-4 p-2 dark:bg-nbk">
                 <div className="flex">
                   <img
@@ -33,7 +33,7 @@ const BlogsList = (props: any) => {
                   </div>
                 </div>
                 <div className="h-40 pt-2">
-                  <AdComponent key={i + 1 * 10} adKey="app_blogs_ten_jm3" />
+                  <AdComponent adKey="app_blogs_ten_jm3" />
                 </div>
               </div>
             )}
@@ -63,20 +63,27 @@ const BlogsList = (props: any) => {
               <div className="w-full overflow-hidden">
                 <Link to={`/blogs/detail?tab=${tab}&id=${d.id}`}>
                   <img
-                    src={setting?.img_host + d.photo}
-                    alt={d.title}
+                    src={
+                      setting?.img_host && d?.photo ? `${setting.img_host}${d.photo}` : "/images/chapter_default.jpg"
+                    }
+                    alt={d.title || "image"}
                     loading="lazy"
+                    decoding="async"
                     onLoad={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.opacity = "1";
+                      e.currentTarget.style.opacity = "1";
                     }}
                     onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/images/chapter_default.jpg";
+                      const img = e.currentTarget;
+                      // 避免 fallback 圖也壞掉導致無限觸發
+                      if (!img.src.includes("chapter_default.jpg")) {
+                        img.src = "/images/chapter_default.jpg";
+                      } else {
+                        img.style.opacity = "1";
+                      }
                     }}
                     className="h-80 w-full object-cover bg-gy"
                     style={{
-                      opacity: "0",
+                      opacity: 0,
                       transition: "opacity 0.5s ease-in-out",
                     }}
                   />

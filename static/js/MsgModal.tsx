@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { IconButton } from "@mui/material";
 import Button from "@mui/material/Button";
 import Dialog from "@mui/material/Dialog";
-import DialogTitle from "@mui/material/DialogTitle";
-import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import Slide from "@mui/material/Slide";
 import { TransitionProps } from "@mui/material/transitions";
-import Series from "../Comic/Series";
+import React, { useState } from "react";
 import { useGlobalConfig } from "../../GlobalContext";
+import Series from "../Comic/Series";
 
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & {
@@ -145,6 +144,8 @@ const MsgModal = (props: any) => {
               // paddingY: "1rem",
               width: "90%",
               height: "60%",
+              color: darkMode ? "#d1d1d1" : "",
+              backgroundColor: darkMode ? "#323232" : "",
             },
             "& .MuiDialogContent-root": {
               padding: 0,
@@ -159,7 +160,7 @@ const MsgModal = (props: any) => {
               position: "absolute",
               right: 8,
               top: 8,
-              color: theme.palette.grey[900],
+              color: darkMode ? "#d1d1d1" : theme.palette.grey[900],
             })}
           >
             <CloseIcon />
@@ -214,16 +215,20 @@ const MsgModal = (props: any) => {
               {content[0].text_section.map((d: any, i: number) => (
                 <div key={i} className="mt-3">
                   <div
-                    className="bg-og border-1 border-solid border-og text-white text-xl flex justify-between rounded-t-lg p-4"
+                    className="bg-og border-1 border-solid border-og text-white text-lg flex justify-between rounded-t-lg p-4"
                     onClick={() => setOpenIndex(openIndex === i ? null : i)}
                   >
-                    <p className="flex">
+                    <p className="w-full flex items-center">
                       {Array.isArray(d.FAQ) &&
                         d.FAQ.map((q: any, index: number) => (
                           <React.Fragment key={index}>
-                            {q}
-                            {q.includes(t("common_q.jJar")) && <img src={content[0].list[0].img} alt="jJar" />}
-                            {q.includes(t("common_q.jCharge")) && <img src={content[0].list[1].img} alt="jCharge" />}
+                            <p>{q}</p>
+                            {q.includes(t("common_q.jJar")) && (
+                              <img src={content[0].list[0].img} alt="jJar" className="px-1 pr-2" />
+                            )}
+                            {q.includes(t("common_q.jCharge")) && (
+                              <img src={content[0].list[1].img} alt="jCharge" className="px-1" />
+                            )}
                           </React.Fragment>
                         ))}
                     </p>

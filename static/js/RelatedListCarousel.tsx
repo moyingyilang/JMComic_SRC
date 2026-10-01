@@ -21,41 +21,55 @@ const RelatedListCarousel = (props: any) => {
         related_list.map((related) => (
           <SwiperSlide key={related.id} className="p-1">
             <div className="relative">
-              <div className="w-full flex items-center overflow-hidden mb-2 ml-2">
+              <div className="w-full h-16 flex items-center overflow-hidden mb-2 ml-2">
                 <img
                   src={
-                    related.user_photo !== ""
-                      ? `${setting?.img_host}/media/users/${related.user_photo}`
-                      : `${setting?.img_host}/media/users/nopic-Male.gif`
+                    setting?.img_host
+                      ? related?.user_photo
+                        ? `${setting.img_host}/media/users/${related.user_photo}`
+                        : `${setting.img_host}/media/users/nopic-Male.gif`
+                      : "/images/ic_head.png"
                   }
-                  alt={related.id}
+                  alt={related?.id || "user"}
                   onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/ic_head.png";
+                    const img = e.currentTarget;
+                    // 防止 fallback 無限觸發
+                    if (!img.src.includes("ic_head.png")) {
+                      img.src = "/images/ic_head.png";
+                    }
                   }}
-                  className="rounded-full object-cover w-10 h-10 m-0"
+                  loading="lazy"
+                  decoding="async"
+                  className="rounded-full object-cover w-10 h-10 m-0 bg-gy"
                 />
-                <p className="ml-4">{related.title}</p>
+                <p className="line-clamp-2 ml-4">{related.title}</p>
               </div>
               <Link to={`/blogs/detail?tab=${queryTab}&id=${related.id}`}>
                 <img
-                  src={setting?.img_host + decodeURIComponent(related.photo)}
-                  alt={related.id}
+                  src={
+                    setting?.img_host && related?.photo
+                      ? `${setting.img_host}${decodeURIComponent(related.photo)}`
+                      : "/images/cover_default.jpg"
+                  }
+                  alt={related?.id || "image"}
                   loading="lazy"
+                  decoding="async"
                   onLoad={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.opacity = "1";
+                    e.currentTarget.style.opacity = "1";
                   }}
                   onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.src = "/images/cover_default.jpg";
+                    const img = e.currentTarget;
+                    // 防止 fallback 無限觸發
+                    if (!img.src.includes("cover_default.jpg")) {
+                      img.src = "/images/cover_default.jpg";
+                    }
                   }}
-                  width="100%"
-                  height="auto"
-                  className="object-cover rounded-md h-48"
+                  width={300}
+                  height={192}
+                  className="object-cover rounded-md h-48 w-full bg-gy"
                   style={{
-                    opacity: "0",
-                    transition: "opacity 0.5s ease-in-out",
+                    opacity: 0,
+                    transition: "opacity 0.4s ease",
                   }}
                 />
               </Link>

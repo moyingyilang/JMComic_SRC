@@ -1,35 +1,43 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { useTranslation } from "react-i18next";
 import CloseIcon from "@mui/icons-material/Close";
-import TopBtn from "../../components/Common/TopBtn";
 import SearchIcon from "@mui/icons-material/Search";
-import Loading from "../../components/Common/Loading";
-import SelectMenu from "../../components/Library/SelectMenu";
-import CreatorList from "../../components/Library/CreatorList";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router-dom";
 import { FETCH_CREATOR_AUTHOR_THUNK, FETCH_CREATOR_WORK_THUNK } from "../../actions/creatorAction";
+import ClickPagination from "../../components/Common/ClickPagination";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
+import TopBtn from "../../components/Common/TopBtn";
+import CreatorList from "../../components/Library/CreatorList";
+import SelectMenu from "../../components/Library/SelectMenu";
+import { useGlobalConfig } from "../../GlobalContext";
+import { GoBack, useScrollToTop } from "../../Hooks";
 import { CLEAR_CREATOR_LIST, LOAD_CREATOR_LIST } from "../../reducers/creatorReducer";
-import { GoBack } from "../../Hooks";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 const Library = () => {
   const { config } = useGlobalConfig();
-  const { setting } = config;
+  const { setting, paginationMode } = config;
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const scrollToTop = useScrollToTop();
   const filterQuery = sessionStorage.getItem("libQuery") || "";
   const libTab = sessionStorage.getItem("lib");
   const libSource = sessionStorage.getItem("libSource") || "";
-  const searchInitialState = { start: false, query: filterQuery, tab: Number(libTab) || 1, page: 1 };
+  const searchInitialState = {
+    start: false,
+    query: filterQuery,
+    tab: Number(libTab) || 1,
+    page: Number(sessionStorage.getItem("libLoadMore")) || 1,
+  };
   const [searchConfig, setSearchConfig] = useState(searchInitialState);
   const [filter, setFilter] = useState<any>({ start: false, language: "", source: libSource });
   const { creatorAuthorList, creatorWorkList, isLoading, isLoadMore } = useAppSelector((state) => state.creator);
 
   const currentTab = searchConfig.tab === 1 ? creatorAuthorList : creatorWorkList;
-  const pageLimit = currentTab.list?.length ? Math.ceil(currentTab.total / 30) : 0;
-  const hasNextPage = searchConfig.page <= pageLimit && pageLimit > 1;
+  const pageLimit = currentTab.total ? Math.ceil(currentTab.total / 30) : 1;
+  const hasNextPage = searchConfig.page < pageLimit && pageLimit > 1;
 
   // GetList
   const loadList = (
@@ -44,6 +52,9 @@ const Library = () => {
       sessionStorage.setItem("catLoadMore", "1");
       setSearchConfig({ ...searchConfig, start: false, query, tab, page: 1 });
       dispatch(CLEAR_CREATOR_LIST("creatorAuthorList"));
+    }
+    if (!isLoadMore) {
+      scrollToTop();
     }
     dispatch(LOAD_CREATOR_LIST({ isLoading: true, isLoadMore, isRefreshing }));
     setTimeout(() => {
@@ -76,8 +87,8 @@ const Library = () => {
   // list
   useEffect(() => {
     if (
-      (searchConfig.tab === 1 && creatorAuthorList.list?.length === 0) ||
-      (searchConfig.tab === 2 && creatorWorkList.list?.length === 0)
+      (searchConfig.tab === 1 && !creatorAuthorList.list?.length) ||
+      (searchConfig.tab === 2 && !creatorWorkList.list?.length)
     ) {
       loadList();
     }
@@ -99,6 +110,13 @@ const Library = () => {
     loadList(true, false, nextPage);
   };
 
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    setSearchConfig({ ...searchConfig, page: targetPage });
+    loadList(false, false, targetPage, searchConfig.query, searchConfig.tab, 0);
+  };
+
   const handleClickTab = (tab: number) => {
     loadList(false, false, 1, "", tab);
     sessionStorage.setItem("lib", String(tab));
@@ -106,11 +124,14 @@ const Library = () => {
   };
 
   return (
-    <>
+    <div className="h-full dark:bg-bk">
       {isLoading && <Loading />}
-      <div className="sticky top-safe h-20 bg-bbk text-white flex items-end p-2 py-3 z-50">
-        <GoBack back={sessionStorage.getItem("fromPage") || "/"} />
-        <p className="ml-4 text-2xl text-og">{t("library.forbidden_comic_library")}</p>
+      <div className="sticky top-safe z-50">
+        <HeaderAds />
+        <div className="h-14 bg-bbk text-white flex items-end p-2 py-3">
+          <GoBack back={sessionStorage.getItem("fromPage") || "/"} />
+          <p className="ml-4 text-2xl text-og">{t("library.forbidden_comic_library")}</p>
+        </div>
       </div>
       <div className="relative w-full flex justify-cneter my-4">
         <input
@@ -196,7 +217,9 @@ const Library = () => {
       <div className="flex flex-col justify-center items-center my-10 pb-40">
         {currentTab.list?.length > 0 && isLoading && <img src="/images/loading.gif" alt="loading" width="80px" />}
         {currentTab.list?.length > 0 &&
-          (hasNextPage ? (
+          (paginationMode === "click" ? (
+            <ClickPagination pageLimit={pageLimit} page={searchConfig.page} onChange={goToPage} loading={isLoading} />
+          ) : hasNextPage ? (
             <button
               onClick={() => handleLoadMore()}
               className="w-4/12 rounded-sm text-white p-2 bg-og shadow-lg shadow-stone-700/50"
@@ -208,7 +231,7 @@ const Library = () => {
           ))}
       </div>
       <TopBtn />
-    </>
+    </div>
   );
 };
 

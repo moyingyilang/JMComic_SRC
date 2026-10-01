@@ -4,7 +4,7 @@ import createAsyncReducer from "./AsyncReducer";
 
 interface MainState {
     mainList: any[];
-    latestList: any[];
+    latestList: { list: any[]; total: number; };
     moreList: { total: number, list: any[]; error: string; };
     coverAds: Record<string, any>,
     adsScript: Record<string, any>;
@@ -21,7 +21,7 @@ interface MainState {
 }
 const initialState: MainState = {
     mainList: [],
-    latestList: [],
+    latestList: { list: [], total: 0 },
     moreList: { total: 0, list: [], error: "" },
     coverAds: {},
     adsScript: {},
@@ -74,11 +74,14 @@ const MainSlice = createSlice({
         },
         GET_LATEST_LIST: (state, action: PayloadAction<any>) => {
             const { latestList, isLastLoadMore } = state;
-            const { data } = action.payload;
-            let currentList = isLastLoadMore ? [...latestList, ...data] : data;
+            const data = action.payload.data;
+            // 目前 API 只回傳純陣列，之後 API 補上 total 後會變成 { list, total }
+            const list = Array.isArray(data) ? data : data?.list ?? [];
+            const total = Array.isArray(data) ? 0 : Number(data?.total) || 0;
+            let currentList = isLastLoadMore ? [...latestList.list, ...list] : list;
             return {
                 ...state,
-                latestList: currentList,
+                latestList: { list: currentList, total },
                 isLastLoading: false,
                 isLastLoadMore: false,
                 isRefreshing: false,
@@ -124,6 +127,8 @@ const MainSlice = createSlice({
             const target = state[listName];
             if (Array.isArray(target)) {
                 target.length = 0;
+            } else if (target && Array.isArray((target as any).list)) {
+                (target as any).list.length = 0;
             } else if (target && typeof target === 'object') {
                 Object.keys(target).forEach(key => {
                     delete (target as Record<string, any>)[key];

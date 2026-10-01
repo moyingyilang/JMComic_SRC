@@ -1,19 +1,17 @@
 import React, { Suspense, useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
-import { AuthChecker, clearAuth } from "./Hooks/useAuth";
-import Loading from "./components/Common/Loading";
-import useScrollRestoration from "./Hooks/useScrollRestoration";
-import usePageTracking from "./Hooks/usePageTrack";
-import { ConfirmAlert } from "./components/Alert/Alert";
-import { getLocalVersion, initHotUpdate } from "./utils/hotModule";
-import { useAppDispatch } from "./store/hooks";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { useGlobalConfig } from "./GlobalContext";
+import { useBackButtonExit, useDevtoolsBlocker, usePWAProtection } from "./Hooks/useAppGuards";
+import { AuthChecker } from "./Hooks/useAuth";
+import usePageTracking from "./Hooks/usePageTrack";
+import useScrollRestoration from "./Hooks/useScrollRestoration";
 import { FETCH_HOST } from "./api/ApiEndpointUtil";
-import { usePWAProtection, useDevtoolsBlocker, useBackButtonExit } from "./Hooks/useAppGuards";
-import GlobalStore from "./config/GlobalStore";
-import { getRandomItems } from "./utils/Function";
+import { ConfirmAlert } from "./components/Alert/Alert";
+import Loading from "./components/Common/Loading";
 import ViewportMeta from "./components/Common/ViewportMeta";
-import Clarity from "@microsoft/clarity";
+import { useAppDispatch } from "./store/hooks";
+import { getRandomItems } from "./utils/Function";
+import { getLocalVersion, initHotUpdate } from "./utils/hotModule";
 
 const Main = React.lazy(() => import("./pages/Main/Main"));
 const Week = React.lazy(() => import("./pages/Main/Week"));
@@ -34,8 +32,13 @@ const Games = React.lazy(() => import("./pages/Categories/Games"));
 const Categories = React.lazy(() => import("./pages/Categories/Categories"));
 const Member = React.lazy(() => import("./pages/Member/Member"));
 const Forum = React.lazy(() => import("./pages/Forum/Forum"));
+const Novels = React.lazy(() => import("./pages/Novel/Novels"));
+const NovelDetail = React.lazy(() => import("./pages/Novel/NovelDetail"));
+const NovelRead = React.lazy(() => import("./pages/Novel/NovelRead"));
 const ErrorPage = React.lazy(() => import("./pages/Main/ErrorPage"));
-const TestComponent = React.lazy(() => import("./pages/TestComponent"));
+// const TestComponent = React.lazy(() => import("./pages/TestComponent"));
+const Pay = React.lazy(() => import("./pages/Sponsor/Pay"));
+const Contact = React.lazy(() => import("./pages/Contact/Contact"));
 
 const fetchHostData = async () => {
   const apiUrl = await FETCH_HOST();
@@ -57,29 +60,41 @@ const App = () => {
   // 禁用F12
   useDevtoolsBlocker();
 
-  if (process.env.REACT_APP_ENV === "production") {
-    console.log("Running in Production Mode!");
-  } else if (process.env.REACT_APP_ENV === "development") {
-    console.log("Running in Development Mode!");
-  }
-
-  // 攔截同步 JS 錯誤
-  window.onerror = function (message, source, lineno, colno, error) {
-    console.warn("JS 錯誤:", { message, source, lineno, colno, error });
-    // showErrorModal(`\n${defaultErrorMsg}`);
-    // setTimeout(() => {
-    //   window.location.href = "/";
-    // }, 60000);
-  };
+  useEffect(() => {
+    if (process.env.REACT_APP_ENV === "production") {
+      console.log("Running in Production Mode!");
+    } else if (process.env.REACT_APP_ENV === "development") {
+      console.log("Running in Development Mode!");
+    }
+    // 攔截同步 JS 錯誤
+    window.onerror = function (message, source, lineno, colno, error) {
+      console.warn("JS 錯誤:", { message, source, lineno, colno, error });
+      // showErrorModal(`\n${defaultErrorMsg}`);
+      // setTimeout(() => {
+      //   window.location.href = "/";
+      // }, 60000);
+    };
+  }, []);
 
   // host init
   useEffect(() => {
     fetchHostData().then((apiUrl) => {
       if (apiUrl) {
-        const { items } = getRandomItems(apiUrl.Server);
+        const filteredServers = apiUrl.jm3_Server.filter(([_, name]: [string, string]) => name !== "線路5");
+
+        const { items } = getRandomItems(filteredServers);
         const newUrl = `https://${items}/`;
         setConfig((prev) => ({ ...prev, hostReady: true, host: newUrl }));
       }
+      // if (process.env.REACT_APP_ENV === "development" && window.location.hostname.includes("localhost")) {
+      //   setConfig((prev) => ({
+      //     ...prev,
+      //     showdone: true,
+      //     defaultCoverImg: "/images/signList/done-icon.png",
+      //   }));
+      //   localStorage.removeItem("adsList");
+      //   localStorage.removeItem("adsContent");
+      // }
     });
   }, []);
 
@@ -96,15 +111,6 @@ const App = () => {
       getVersion();
     }
   }, [config.hostReady]);
-
-  // Clarity
-  useEffect(() => {
-    if (process.env.NODE_ENV === "production") {
-      const projectId = "tpc23aa4d5";
-      Clarity.init(projectId);
-      Clarity.identify("custom-id", "custom-session-id", "custom-page-id", "friendly-name");
-    }
-  }, []);
 
   return (
     <>
@@ -132,8 +138,13 @@ const App = () => {
             <Route path="/games" element={<Games />} />
             <Route path="/member" element={<Member />} />
             <Route path="/daily" element={<Daily />} />
+            <Route path="/novels" element={<Novels />} />
+            <Route path="/pay" element={<Pay />} />
+            <Route path="/novels/detail" element={<NovelDetail />} />
+            <Route path="/novels/detail/read" element={<NovelRead />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="*" element={<ErrorPage />} />
-            <Route path="/test" element={<TestComponent />} />
+            {/* <Route path="/test" element={<TestComponent />} /> */}
           </Routes>
         </Suspense>
       </div>

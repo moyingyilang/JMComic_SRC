@@ -1,15 +1,16 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { Link } from "react-router-dom";
-import FlashOnIcon from "@mui/icons-material/FlashOn";
-import RestaurantIcon from "@mui/icons-material/Restaurant";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
-import SearchIcon from "@mui/icons-material/Search";
-import DialogModal from "../Modal/DialogModal";
-import { useGlobalConfig } from "../../GlobalContext";
+import FlashOnIcon from "@mui/icons-material/FlashOn";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import { ForumTabItems } from "../../assets/JsonData";
-import { useTranslation } from "react-i18next";
+import RestaurantIcon from "@mui/icons-material/Restaurant";
+import SearchIcon from "@mui/icons-material/Search";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
+import { ForumTabItems } from "../../assets/JsonData";
+import { useGlobalConfig } from "../../GlobalContext";
+import DialogModal from "../Modal/DialogModal";
+import HeaderAds from "./HeaderAds";
 
 const Header = (props: any) => {
   const { setTabChange, filter, setFilter, currentPage, catList, subList, mode, setMode } = props;
@@ -29,6 +30,7 @@ const Header = (props: any) => {
 
   return (
     <header className="sticky top-safe w-full bg-bbk text-white z-30">
+      <HeaderAds />
       <div className="h-14 flex items-center">
         <div className="flex w-6/12 pl-3">
           <Link to="/">
@@ -110,7 +112,7 @@ const Header = (props: any) => {
         </div>
       )}
       {currentPage === "forum" && (
-        <div className="h-20 w-full text-tgy flex items-end py-2 bg-nbk z-50">
+        <div className="h-14 w-full text-tgy flex items-end pt-2 bg-nbk z-50">
           {tabItems.map((d) => (
             <div
               key={d.mode}

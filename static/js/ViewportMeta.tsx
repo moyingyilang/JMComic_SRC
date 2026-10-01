@@ -1,15 +1,16 @@
 import { Helmet } from "react-helmet";
 import { useLocation } from "react-router-dom";
 
-const ViewportMeta = () => {
-  const location = useLocation();
-  const pathSegments = location.pathname.split("/");
-  const lastSegment = pathSegments[pathSegments.length - 1];
+const READ_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=4, user-scalable=yes, viewport-fit=cover";
 
-  const viewportContent =
-    lastSegment === "read"
-      ? "width=device-width, initial-scale=1, maximum-scale=4, user-scalable=yes, viewport-fit=cover"
-      : "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+
+const ViewportMeta = () => {
+  const { pathname } = useLocation();
+
+  const isReadPage = pathname.endsWith("/read");
+
+  const viewportContent = isReadPage ? READ_VIEWPORT : DEFAULT_VIEWPORT;
 
   return (
     <Helmet>

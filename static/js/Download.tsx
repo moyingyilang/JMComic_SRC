@@ -1,27 +1,15 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { useTranslation } from "react-i18next";
 import ReplayIcon from "@mui/icons-material/Replay";
-import Loading from "../../components/Common/Loading";
-import AdComponent from "../../components/Ads/AdComponent";
-import { DownloadAlert } from "../../components/Alert/Alert";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import { FETCH_ALBUM_DOWNLOAD_THUNK } from "../../actions/detailAction";
-import { CLEAR_MAIN_LIST } from "../../reducers/mainReducer";
+import AdComponent from "../../components/Ads/AdComponent";
+import { CaptchaAlert } from "../../components/Alert/Alert";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
 import { GoBack } from "../../Hooks";
-
-const generateMathProblem = () => {
-  const num1 = Math.floor(Math.random() * 100) + 1;
-  const num2 = Math.floor(Math.random() * 10) + 1;
-
-  const problem = `${num1} + ${num2}`;
-  const answer = num1 + num2;
-
-  return {
-    problem,
-    answer: answer.toString(),
-  };
-};
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { generateMathProblem } from "../../utils/Function";
 
 const Download = () => {
   const { t } = useTranslation();
@@ -73,9 +61,12 @@ const Download = () => {
         <Loading />
       ) : (
         <>
-          <div className="bg-nbk relative w-full h-14 text-white flex items-center px-3 py-2 z-20">
-            <GoBack back={-1} />
-            <div className="ml-4">{t("detail.download_page")}</div>
+          <div className="sticky top-safe z-50">
+            <HeaderAds />
+            <div className="bg-nbk w-full h-14 text-white flex items-center px-3 py-2">
+              <GoBack back={-1} />
+              <div className="ml-4">{t("detail.download_page")}</div>
+            </div>
           </div>
           <div className="w-full mx-auto flex justify-center my-4">
             {!isLoading && <AdComponent adKey="download1" />}
@@ -121,12 +112,13 @@ const Download = () => {
             </div>
           </div>
           {(!isLogined || (!isCorrect && isCorrect !== null)) && (
-            <DownloadAlert
+            <CaptchaAlert
               albumDownloadDetail={albumDownloadDetail}
               isLogined={isLogined}
               setIsLogined={setIsLogined}
               isCorrect={isCorrect}
               setIsCorrect={setIsCorrect}
+              setUserAnswer={setUserAnswer}
             />
           )}
         </>

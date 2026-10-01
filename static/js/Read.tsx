@@ -1,41 +1,39 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { motion, AnimatePresence } from "framer-motion";
-import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
-import { Pagination } from "swiper/modules";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { useInView } from "react-intersection-observer";
-import ShareIcon from "@mui/icons-material/Share";
-import FlashOnIcon from "@mui/icons-material/FlashOn";
+import { Capacitor } from "@capacitor/core";
 import CloseIcon from "@mui/icons-material/Close";
-import Series from "../../components/Comic/Series";
+import FlashOnIcon from "@mui/icons-material/FlashOn";
+import ShareIcon from "@mui/icons-material/Share";
+import { AnimatePresence, motion } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
+import { FETCH_COMIC_READ_THUNK } from "../../actions/detailAction";
+import { FETCH_POST_NOTIFICATIONS_SERTRACK_THUNK } from "../../actions/memberAction";
+import AdComponent from "../../components/Ads/AdComponent";
+import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
 import Comment from "../../components/Comic/Comment";
 import ReadNav from "../../components/Comic/ReadNav";
+import Series from "../../components/Comic/Series";
 import Share from "../../components/Comic/Share";
-import MsgModal from "../../components/Modal/MsgModal";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
 import DialogModal from "../../components/Modal/DialogModal";
 import MemberModal from "../../components/Modal/MemberModal";
-import Loading from "../../components/Common/Loading";
-import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
-import { FETCH_DETAIL_THUNK, FETCH_COMIC_READ_THUNK } from "../../actions/detailAction";
-import { FETCH_POST_NOTIFICATIONS_SERTRACK_THUNK } from "../../actions/memberAction";
-import { CLEAR_DETIAL_LIST, LOAD_COMBIC_DETIAL_LIST, RESET_DETAIL_STATE } from "../../reducers/detailReducer";
+import MsgModal from "../../components/Modal/MsgModal";
+import { useGlobalConfig } from "../../GlobalContext";
+import { GoBack } from "../../Hooks";
+import { CLEAR_DETIAL_LIST, LOAD_COMBIC_DETIAL_LIST } from "../../reducers/detailReducer";
 import { RESET_FORUM_STATE } from "../../reducers/forumReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { scramble_image } from "../../utils/Function";
 import { defaultUserFormData } from "../../utils/InterFace";
-import { GoBack, useDelayedFlag, useScrambleTracker } from "../../Hooks";
-import { chunkArray, scramble_image } from "../../utils/Function";
-import AdComponent from "../../components/Ads/AdComponent";
-import { Capacitor } from "@capacitor/core";
 
 const Read = () => {
   const navigate = useNavigate();
   const { config, setConfig } = useGlobalConfig();
-  const { setting, logined } = config;
+  const { setting, logined, memberInfo } = config;
   const { t } = useTranslation();
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
-  const readRules = t("detail.read_rules", { returnObjects: true });
   const [dialogOpen, setDialogOpen] = useState({
     readSource: false,
     login: false,
@@ -76,6 +74,7 @@ const Read = () => {
   const [scrollProgress, setScrollProgress] = useState(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const swiperRef = useRef<any>(null);
+  const trackMsgShownRef = useRef(false);
 
   useEffect(() => {
     const isNative = Capacitor.isNativePlatform();
@@ -103,18 +102,44 @@ const Read = () => {
     dispatch(CLEAR_DETIAL_LIST("readList"));
     dispatch(RESET_FORUM_STATE());
     if (readId && queryId) {
-      dispatch(FETCH_COMIC_READ_THUNK(readId));
+      dispatch(FETCH_COMIC_READ_THUNK({ id: readId, express: config.express }));
       // dispatch(FETCH_DETAIL_THUNK(queryId));
     }
+  }, [readId, queryId, config.app_img_shunt]);
+
+  // 切換直橫向只需要重置畫面位置，不重打 API
+  useEffect(() => {
+    setScrollProgress(1);
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
     if (swiperRef.current?.swiper && !isVertical) {
       swiperRef.current.swiper.slideTo(0, 0);
     }
-  }, [readId, queryId, isVertical, config.app_img_shunt]);
+  }, [isVertical]);
+
+  const waitForImageLoad = (img: HTMLImageElement) =>
+    new Promise<void>((resolve) => {
+      if (img.complete) return resolve();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+    });
+
+  const bindImageEvents = (el: HTMLElement) => {
+    if ((el as any)._hasBind) return;
+    (el as any)._hasBind = true;
+
+    el.addEventListener("click", () => setCloseNav((prev) => !prev));
+    el.addEventListener("contextmenu", (e) => e.preventDefault());
+  };
 
   const loadImages = async () => {
     dispatch(LOAD_COMBIC_DETIAL_LIST({ isLoading: true }));
-    const imagesContain = imgRefs.current;
-    const maxIndex = imagesContain.length - 1;
+
+    const images = imgRefs.current;
+    const maxIndex = images.length - 1;
+
     const indexesToLoad = [
       scrollProgress - 2,
       scrollProgress - 1,
@@ -126,40 +151,31 @@ const Read = () => {
     try {
       await Promise.allSettled(
         indexesToLoad.map(async (index) => {
-          const img = imagesContain[index];
-
+          const img = images[index];
           if (!img) return;
 
-          const existingCanvas = img.nextElementSibling;
-          const isCanvasMissingOrInvalid = !(existingCanvas instanceof HTMLCanvasElement);
+          const canvas = img.nextElementSibling;
+          const needsProcess = !(canvas instanceof HTMLCanvasElement);
 
-          if (isCanvasMissingOrInvalid) {
-            await new Promise<void>((resolve) => {
-              if (img.complete) resolve();
-              else {
-                img.onload = () => resolve();
-                img.onerror = () => resolve();
-              }
-            });
+          if (!needsProcess) return;
 
-            await scramble_image(img, readList.id, readList.scramble_id, img.alt);
-            const canvas = img.nextElementSibling;
+          await waitForImageLoad(img);
 
-            if (canvas instanceof HTMLCanvasElement) {
-              canvas.style.position = "absolute";
-              canvas.style.top = "0";
-              canvas.addEventListener("click", () => setCloseNav((prev) => !prev));
-              canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-            }
+          await scramble_image(img, readList.id, readList.scramble_id, img.alt);
 
-            dispatch(LOAD_COMBIC_DETIAL_LIST({ isLoading: false }));
+          const newCanvas = img.nextElementSibling;
 
-            if (canvas === null || img.src.endsWith(".gif")) {
-              img.classList.remove("opacity-0");
-              img.style.opacity = "1";
-              img.dataset.noScrambleMark = "noScramble";
-              img.addEventListener("click", () => setCloseNav((prev) => !prev));
-            }
+          if (newCanvas instanceof HTMLCanvasElement) {
+            newCanvas.style.position = "absolute";
+            newCanvas.style.top = "0";
+            bindImageEvents(newCanvas);
+          }
+
+          if (!newCanvas || img.src.endsWith(".gif")) {
+            img.classList.remove("opacity-0");
+            img.style.opacity = "1";
+            img.dataset.noScrambleMark = "noScramble";
+            bindImageEvents(img);
           }
         })
       );
@@ -176,6 +192,7 @@ const Read = () => {
 
   // 直向滾動監聽
   useEffect(() => {
+    trackMsgShownRef.current = false;
     if (isVertical && !isLoading) {
       let lastScrollTop = 0;
       let accumulatedScrollDown = 0;
@@ -199,8 +216,14 @@ const Read = () => {
                 const lastImageIndex = total_page + 3;
                 const lastObject = detailList.series[detailList.series.length - 1];
                 const storedData = localStorage.getItem("dontShowExpiry");
-                if (progress === lastImageIndex && querySubEp === lastObject.sort) {
-                  setMsgOpen({ ...msgOpen, readTrack: storedData === null });
+                if (
+                  progress === lastImageIndex &&
+                  querySubEp === lastObject.sort &&
+                  storedData === null &&
+                  !trackMsgShownRef.current
+                ) {
+                  trackMsgShownRef.current = true;
+                  setMsgOpen((prev) => ({ ...prev, readTrack: true }));
                 }
               }
             }
@@ -376,6 +399,7 @@ const Read = () => {
 
   // 下方左右切換章節
   const handlePageChange = (direction: "next" | "prev") => {
+    closeExpress();
     setChangeCurrentPage({ ...changeCurrentPage, next: true, prev: true });
     const { series } = detailList;
     if (series?.length > 0) {
@@ -463,23 +487,43 @@ const Read = () => {
     }
   }, [setting?.is_cn]);
 
+  const closeExpress = () => {
+    if (config.express === "on") {
+      sessionStorage.setItem("imageSource", "1");
+
+      setConfig((prev) => ({ ...prev, express: "", app_img_shunt: "1" }));
+    }
+  };
+
   return (
     <>
       {isLoading && <Loading />}
       <div className="h-full bg-white text-white relative">
         <motion.div
           initial={{ y: 0 }}
-          animate={{ y: closeNav ? -64 : 0 }}
+          animate={{ y: closeNav ? -200 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className={`fixed top-0 top-safe w-full h-14 bg-nbk bg-opacity-90 flex justify-between items-center px-3 py-2 z-50`}
+          className={`fixed top-[calc(env(safe-area-inset-top)+0px)] w-full bg-nbk bg-opacity-90 flex flex-col z-40`}
         >
-          <GoBack
-            back={`/comic/detail?id=${queryId || detailList.series_id}&readId=${readId}&episode=${
-              seriesGroups.episode
-            }&subEpisode=${seriesGroups.subEpisode}`}
-          />
-          <p className="truncate w-10/12">{readList.name}</p>
-          <ShareIcon sx={{ fontSize: 26, stroke: "white", strokeWidth: 1 }} onClick={() => setShare(true)} />
+          <HeaderAds />
+          <AnimatePresence>
+            {!dialogOpen.comment && (
+              <motion.div
+                initial={{ y: 0 }}
+                animate={{ y: !dialogOpen.comment ? 0 : -200 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="w-full flex justify-between items-center h-14 px-3 py-2"
+              >
+                <GoBack
+                  back={`/comic/detail?id=${queryId || detailList.series_id}&readId=${readId}&episode=${
+                    seriesGroups.episode
+                  }&subEpisode=${seriesGroups.subEpisode}`}
+                />
+                <p className="truncate w-10/12">{readList.name}</p>
+                <ShareIcon sx={{ fontSize: 26, stroke: "white", strokeWidth: 1 }} onClick={() => setShare(true)} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
         <div
           onClick={(e) => e.preventDefault()}
@@ -494,7 +538,9 @@ const Read = () => {
         >
           {isVertical ? (
             <>
-              <AdComponent adKey="app_chapter_top" comicId={queryId} />
+              <div className="w-full">
+                <AdComponent adKey="app_chapter_top" comicId={queryId} />
+              </div>
               {readList.images?.length > 0 &&
                 readList.images.map((d: any, i: number) => (
                   <div key={d.page} className="w-full relative mt-[-2px]">
@@ -515,7 +561,9 @@ const Read = () => {
                   </div>
                 ))}
               <AdComponent adKey="app_thewayhome" comicId={queryId} />
-              <AdComponent adKey="app_chapter_last" comicId={queryId} />
+              <div className="w-full flex justify-center">
+                <AdComponent adKey="app_chapter_last" comicId={queryId} />
+              </div>
             </>
           ) : (
             <>
@@ -582,6 +630,7 @@ const Read = () => {
                 handlerReadStorage={handlerReadStorage}
                 readHistory={readHistory}
                 setDialogOpen={setDialogOpen}
+                closeExpress={closeExpress}
               />
             </div>
           </div>
@@ -600,15 +649,13 @@ const Read = () => {
               <p className="ml-5 truncate w-9/12">{readList.name}</p>
             </div>
             <div className="w-full m-auto text-gy dark:text-tgy dark:bg-bbk">
-              <div className="py-3 px-2">
-                {Array.isArray(readRules) && readRules.map((d: any) => <p key={d}>{d}</p>)}
-              </div>
+              <div className="py-3 px-2"></div>
               <Comment
                 t={t}
-                setConfig={setConfig}
                 bottomTopicInput={true}
                 queryId={queryId}
                 setting={setting}
+                memberInfo={memberInfo}
                 logined={logined}
                 dialogOpen={dialogOpen}
                 setDialogOpen={setDialogOpen}

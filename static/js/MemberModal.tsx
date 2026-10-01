@@ -1,37 +1,36 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import CloseIcon from "@mui/icons-material/Close";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ReplayIcon from "@mui/icons-material/Replay";
 import {
   AppBar,
-  Toolbar,
-  Slide,
   Button,
-  Typography,
+  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  Dialog,
   IconButton,
+  Slide,
+  Toolbar,
+  Typography,
 } from "@mui/material";
-import { TransitionProps } from "@mui/material/transitions";
-import { CommonQData } from "../../assets/JsonData";
 import CircularProgress from "@mui/material/CircularProgress";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Pagination, Keyboard, Scrollbar } from "swiper/modules";
-import {
-  FETCH_LOGIN_THUNK,
-  FETCH_SIGN_UP_THUNK,
-  FETCH_FORGOT_THUNK,
-  FETCH_LOGOUT_THUNK,
-} from "../../actions/memberAction";
-import { CLEAR_MEMBER_LIST, RESET_MEMBER_STATE } from "../../reducers/memberReducer";
+import { TransitionProps } from "@mui/material/transitions";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Keyboard, Pagination, Scrollbar } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/react";
+import {
+  FETCH_FORGOT_THUNK,
+  FETCH_LOGIN_THUNK,
+  FETCH_LOGOUT_THUNK,
+  FETCH_SIGN_UP_THUNK,
+} from "../../actions/memberAction";
+import { CommonQData } from "../../assets/JsonData";
+import { CLEAR_MEMBER_LIST, RESET_MEMBER_STATE } from "../../reducers/memberReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & {
@@ -47,6 +46,7 @@ const MemberModal = (props: any) => {
     memberInfo,
     logined,
     isLoading,
+    setting,
     setConfig,
     dialogOpen,
     setDialogOpen,
@@ -57,6 +57,9 @@ const MemberModal = (props: any) => {
     langChange,
     setLangChange,
     switchLanguage,
+    paginationModeChange,
+    setPaginationModeChange,
+    switchPaginationMode,
     list,
     isRefreshing,
     handleRefresh,
@@ -66,6 +69,7 @@ const MemberModal = (props: any) => {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const CommonQ = CommonQData();
   const swiperRef = useRef<any>(null);
+  const isLoginSubmitting = useRef(false);
   const dispatch = useAppDispatch();
   const { info, memberResult } = useAppSelector((state) => state.member);
 
@@ -86,6 +90,7 @@ const MemberModal = (props: any) => {
       setting: false,
       darkMode: false,
       lang: false,
+      pagination: false,
       logout: false,
       achievement: false,
     });
@@ -94,7 +99,7 @@ const MemberModal = (props: any) => {
   const handleSubmit = (formName: string, e: React.SyntheticEvent) => {
     e.preventDefault();
     dispatch(RESET_MEMBER_STATE());
-    console.log("Form data:", formData);
+    // console.log("Form data:", formData);
 
     if (formName === "signUp" && formData.signUp.adult === false) {
       showSnackbar(t("login.confirm_18"), "error");
@@ -107,6 +112,7 @@ const MemberModal = (props: any) => {
     }
     switch (formName) {
       case "login":
+        isLoginSubmitting.current = true;
         dispatch(FETCH_LOGIN_THUNK({ username: formData.login.username, password: formData.login.password }));
         localStorage.setItem("memberAccount", JSON.stringify(formData.login));
         break;
@@ -151,14 +157,15 @@ const MemberModal = (props: any) => {
     const { code, errorMsg } = info;
     if (code === 401 && errorMsg) {
       showSnackbar(errorMsg, "error");
-    } else {
-      if (code === 200) {
-        showSnackbar(t("login.login_success"), "success");
-        setConfig((prev: any) => ({ ...prev, logined: true, memberInfo: info.data }));
-        setDialogOpen({ ...dialogOpen, login: false });
-      }
+    } else if (code === 200 && isLoginSubmitting.current) {
+      showSnackbar(t("login.login_success"), "success");
+      setConfig?.((prev: any) => ({ ...prev, logined: true, memberInfo: info.data }));
+      setDialogOpen({ ...dialogOpen, login: false });
     }
-    dispatch(CLEAR_MEMBER_LIST("info"));
+    if (code) {
+      isLoginSubmitting.current = false;
+      dispatch(CLEAR_MEMBER_LIST("info"));
+    }
   }, [info]);
 
   useEffect(() => {
@@ -449,7 +456,7 @@ const MemberModal = (props: any) => {
         </Dialog>
       )}
 
-      {dialogOpen.invite && (
+      {dialogOpen.invite && memberInfo && (
         <Dialog
           onClose={handleClose}
           aria-labelledby="customized-dialog-title"
@@ -484,24 +491,26 @@ const MemberModal = (props: any) => {
           </IconButton>
           <DialogContent sx={{ paddingY: 0, fontSize: 14 }}>
             <div className="px-4">
-              <img
-                src={memberInfo.invitation_qrcode}
-                alt={memberInfo.invitation_qrcode}
-                loading="lazy"
-                onLoad={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.opacity = "1";
-                }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = "/images/chapter_default.jpg";
-                }}
-                className="w-40 h-40 object-cover rounded-md mx-auto"
-                style={{
-                  opacity: "0",
-                  transition: "opacity 0.5s ease-in-out",
-                }}
-              />
+              {memberInfo.invitation_qrcode && (
+                <img
+                  src={memberInfo.invitation_qrcode}
+                  alt="invitation_qrcode"
+                  loading="lazy"
+                  onLoad={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.opacity = "1";
+                  }}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/images/chapter_default.jpg";
+                  }}
+                  className="w-40 h-40 object-cover rounded-md mx-auto"
+                  style={{
+                    opacity: "0",
+                    transition: "opacity 0.5s ease-in-out",
+                  }}
+                />
+              )}
               <span>{t("member_card.invite_link")}:</span>
               <div className="flex items-center bg-og text-white rounded mb-4">
                 <p className="w-10/12 bg-bbk px-2 py-1">{memberInfo.invitation_url}</p>
@@ -802,7 +811,11 @@ const MemberModal = (props: any) => {
                     {d.name}
                   </span>
                   <p className="py-1 text-blue-800 underline">
-                    <a href={d.desc} target="_blank" rel="noreferrer">
+                    <a
+                      href={d.desc.startsWith("http") ? d.desc : setting.main_web_host}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       {d.desc}
                     </a>
                   </p>
@@ -879,6 +892,66 @@ const MemberModal = (props: any) => {
               onClick={(e) => {
                 handleClose(e);
                 switchLanguage();
+              }}
+            >
+              {t("member.confirm")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
+      {dialogOpen.pagination && (
+        <Dialog
+          onClose={handleClose}
+          aria-labelledby="customized-dialog-title"
+          open={dialogOpen.pagination}
+          TransitionComponent={Transition}
+          sx={(theme) => ({
+            "& .MuiPaper-root": {
+              width: "90%",
+              backgroundColor: theme.palette.grey[900],
+            },
+          })}
+        >
+          <DialogTitle sx={{ m: 0, p: 2 }} className="text-white text-center" id="customized-dialog-title">
+            {t("setting.switch_pagination")}
+          </DialogTitle>
+          <IconButton
+            aria-label="close"
+            onClick={handleClose}
+            sx={(theme) => ({
+              position: "absolute",
+              right: 8,
+              top: 8,
+              color: theme.palette.grey[100],
+            })}
+          >
+            <CloseIcon />
+          </IconButton>
+          <DialogContent dividers>
+            <Typography gutterBottom className="flex flex-col justify-center items-center text-white text-center gap-2 p-2">
+              {[
+                { value: "infinite", name: t("setting.pagination_infinite") },
+                { value: "click", name: t("setting.pagination_click") },
+              ].map((d) => (
+                <span
+                  key={d.value}
+                  className={`w-full border-[1px] border-og p-3 rounded ${
+                    paginationModeChange === d.value ? "bg-og" : ""
+                  }`}
+                  onClick={() => setPaginationModeChange(d.value)}
+                >
+                  {d.name}
+                </span>
+              ))}
+            </Typography>
+          </DialogContent>
+          <DialogActions className="flex justify-center mb-4">
+            <Button
+              className="bg-og text-white text-base rounded border-solid border-2 border-og px-6"
+              onClick={(e) => {
+                handleClose(e);
+                switchPaginationMode();
               }}
             >
               {t("member.confirm")}

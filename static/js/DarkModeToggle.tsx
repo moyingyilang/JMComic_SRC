@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 interface DarkModeToggleProps {
@@ -41,7 +41,7 @@ const DarkModeToggle: React.FC<DarkModeToggleProps> = ({ isButtonVisible }) => {
 
   return (
     <button onClick={toggleDarkMode} className="text-og">
-      {darkMode ? t("comic.close") : t("comic.open")}
+      {darkMode ? t("comic.open") : t("comic.close")}
     </button>
   );
 };

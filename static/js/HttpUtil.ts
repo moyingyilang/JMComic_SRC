@@ -1,10 +1,10 @@
 
 import CryptoJS from "crypto-js";
 import md5 from "md5";
-import { showErrorModal } from "../utils/showErrorModal";
-import { getTaipeiTimeString } from "../utils/Function";
-import apiPaths from "./apiPaths";
 import GlobalStore from "../config/GlobalStore";
+import { getTaipeiTimeString } from "../utils/Function";
+import { showErrorModal } from "../utils/showErrorModal";
+import apiPaths from "./apiPaths";
 
 const maxRetries = 3;
 let getRetryCount = 0;
@@ -14,8 +14,8 @@ const version = process.env.REACT_APP_VERSION;
 let d1 = new Date();
 let gmtTime = new Date(d1.toUTCString());
 let time = Math.floor(gmtTime.getTime() / 1000);
-let tokenParam = time + "," + version;
-let token = md5(String(time) + apiPaths.token);
+export let tokenParam = time + "," + version;
+export let token = md5(String(time) + apiPaths.token);
 
 export const tryDecryption = async (response: any, successCallback: (responseObj: any) => void, url: string) => {
     const responseObj = await response.json();
@@ -80,25 +80,64 @@ const fetchWithTimeout = (url: string, method: string, fetchPromise: Promise<Res
     ]);
 };
 
+const buildErrorMsg = (method: string, url: string) =>
+    `${method} 發生錯誤，請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version} 版，最新版本為 ${version} 版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
+
 const HttpUtil = {
+    fetchImage: async (
+        url: string,
+        params: Record<string, any> = {},
+        successCallback: (result: string | Record<string, any>) => void,
+        failCallback: (error: any) => void,
+    ): Promise<any> => {
+        const filteredParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ""));
+        const searchParams = new URLSearchParams(filteredParams);
+        const fullUrl = Object.keys(filteredParams).length ? `${url}?${searchParams.toString()}` : url;
+
+        try {
+            const jwttoken = JSON.parse(localStorage.getItem("jwttoken") as string) || "";
+            const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || "";
+
+            const response = await fetchWithTimeout(
+                fullUrl,
+                "GET",
+                fetch(fullUrl, {
+                    credentials: "include",
+                    referrerPolicy: "no-referrer",
+                    headers: {
+                        "Tokenparam": tokenParam,
+                        "Token": token,
+                        "Authorization": jwttoken ? `Bearer ${jwttoken}` : "",
+                        "Cookie": memberInfo ? `AVS=${memberInfo?.s}` : "",
+                    },
+                }),
+            );
+
+            if (!response.ok) {
+                const msg = buildErrorMsg("GET", fullUrl);
+                failCallback(`${response.status}\n${msg}`);
+                return;
+            }
+
+            const blob = await response.blob();
+            successCallback(URL.createObjectURL(blob));
+        } catch (error: any) {
+            failCallback(error);
+            throw new Error(error?.message || error);
+        }
+    },
     fetchGet: async (
         url: string,
         params: Record<string, any> = {},
         successCallback: (responseObj: any) => void,
         failCallback: (error: any) => void,
     ): Promise<any> => {
-        if (params) {
-            const paramsBody = Object.keys(params)
-                .reduce((a: string[], k: string) => {
-                    a.push(k + "=" + encodeURIComponent(params[k]));
-                    return a;
-                }, [])
-                .join("&");
-
-            if (paramsBody) {
-                url += "?" + paramsBody;
-            }
+        const filteredParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ""));
+        const searchParams = new URLSearchParams(filteredParams);
+        if (!searchParams.has("lang")) {
+            searchParams.set("lang", localStorage.getItem("lang") || "TW");
         }
+        url += "?" + searchParams.toString();
         try {
             const jwttoken = JSON.parse(localStorage.getItem("jwttoken") as string) || "";
             const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || "";
@@ -108,6 +147,7 @@ const HttpUtil = {
                 "GET",
                 fetch(url, {
                     credentials: "include",
+                    referrerPolicy: "no-referrer",
                     headers: {
                         "Tokenparam": tokenParam,
                         "Token": token,
@@ -118,17 +158,15 @@ const HttpUtil = {
             );
 
             if (!response.ok && response.status !== 401) {
-                const defaultErrorMsg = `Get 發生錯誤，請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version} 版，最新版本為 ${version} 版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
-
+                const msg = buildErrorMsg("GET", url);
                 if (getRetryCount < maxRetries) {
                     getRetryCount++;
-                    failCallback(`${response.status}\n${defaultErrorMsg}`);
+                    failCallback(`${response.status}\n${msg}`);
                     HttpUtil.fetchGet(url, {}, successCallback, failCallback);
                     return;
-                } else {
-                    failCallback(`達到最大重試次數\n${defaultErrorMsg}`);
-                    showErrorModal(`${response.status}\n${defaultErrorMsg}`);
                 }
+                failCallback(`達到最大重試次數\n${msg}`);
+                showErrorModal(url, `${response.status}\n${msg}`);
             }
 
             await tryDecryption(response, successCallback, url);
@@ -136,8 +174,8 @@ const HttpUtil = {
         } catch (error: any) {
             failCallback(error);
             const errorMessage = error?.message || error;
-            if (errorMessage.includes("請求逾時")) {
-                showErrorModal(`錯誤：${errorMessage}`);
+            if (errorMessage.includes("timeout")) {
+                showErrorModal(url, `錯誤：${errorMessage}`);
             }
             throw new Error(errorMessage);
         }
@@ -151,12 +189,7 @@ const HttpUtil = {
     ): Promise<any> => {
 
         const formData = new FormData();
-
-        if (Object.keys(params).length > 0) {
-            Object.entries(params).forEach(([key, value]) => {
-                formData.append(key, value);
-            });
-        }
+        Object.entries(params).forEach(([key, value]) => formData.append(key, value));
         try {
             const jwttoken = JSON.parse(localStorage.getItem("jwttoken") as string) || "";
             const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || "";
@@ -167,6 +200,7 @@ const HttpUtil = {
                 fetch(url, {
                     method: "POST",
                     credentials: "include",
+                    referrerPolicy: "no-referrer",
                     headers: {
                         "Tokenparam": tokenParam,
                         "Token": token,
@@ -177,18 +211,17 @@ const HttpUtil = {
                 }),
             );
 
-            if (!response.ok && response.status !== 401) {
-                const defaultErrorMsg = `POST 發生錯誤，請回報管理員 \n\n現在時間：${getTaipeiTimeString()} ,\nsource=${getApiHostInfo()?.hostName}\nkey=${parseUrl(url)}\n\n＊目前版本為 ${version}版，最新版本為 ${version}版\n\n若仍有問題請截圖到官方Discord群\nhttps://discord.gg/V74p7HM\n#網站與app問題回報\n\n`;
-
+            // 400 是業務邏輯/驗證錯誤（如驗證碼錯誤、重複回報），不重試，直接把回應內容交給 successCallback 讓上層依 code/errorMsg 處理
+            if (!response.ok && response.status !== 401 && response.status !== 400) {
+                const msg = buildErrorMsg("POST", url);
                 if (postRetryCount < maxRetries) {
                     postRetryCount++;
-                    failCallback(`${response.status}\n${defaultErrorMsg}`);
+                    failCallback(`${response.status}\n${msg}`);
                     HttpUtil.fetchPost(url, {}, successCallback, failCallback);
                     return;
-                } else {
-                    failCallback(`達到最大重試次數\n${defaultErrorMsg}`);
-                    showErrorModal(`${response.status}\n${defaultErrorMsg}`);
                 }
+                failCallback(`達到最大重試次數\n${msg}`);
+                showErrorModal(url, `${response.status}\n${msg}`);
             }
 
             await tryDecryption(response, successCallback, url);
@@ -196,8 +229,62 @@ const HttpUtil = {
         } catch (error: any) {
             failCallback(error);
             const errorMessage = error?.message || error;
-            if (errorMessage.includes("請求逾時")) {
-                showErrorModal(errorMessage);
+            if (errorMessage.includes("timeout")) {
+                showErrorModal(url, errorMessage);
+            }
+            throw new Error(errorMessage);
+        }
+    },
+    // 給需要真正 JSON body（Content-Type: application/json，而非 multipart/form-data）的 API 用，
+    // 例如 body 裡帶陣列/巢狀物件的情況
+    fetchPostJson: async (
+        url: string,
+        params: Record<string, any> = {},
+        successCallback: (responseObj: any) => void,
+        failCallback: (error: any) => void,
+    ): Promise<any> => {
+        try {
+            const jwttoken = JSON.parse(localStorage.getItem("jwttoken") as string) || "";
+            const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || "";
+
+            const response = await fetchWithTimeout(
+                url,
+                "POST",
+                fetch(url, {
+                    method: "POST",
+                    credentials: "include",
+                    referrerPolicy: "no-referrer",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Tokenparam": tokenParam,
+                        "Token": token,
+                        "Authorization": jwttoken ? `Bearer ${jwttoken}` : "",
+                        "Cookie": memberInfo ? `AVS=${memberInfo?.s}` : "",
+                    },
+                    body: JSON.stringify(params),
+                }),
+            );
+
+            // 400 是業務邏輯/驗證錯誤，不重試，直接把回應內容交給 successCallback 讓上層依 status/msg 處理
+            if (!response.ok && response.status !== 401 && response.status !== 400) {
+                const msg = buildErrorMsg("POST", url);
+                if (postRetryCount < maxRetries) {
+                    postRetryCount++;
+                    failCallback(`${response.status}\n${msg}`);
+                    HttpUtil.fetchPostJson(url, params, successCallback, failCallback);
+                    return;
+                }
+                failCallback(`達到最大重試次數\n${msg}`);
+                showErrorModal(url, `${response.status}\n${msg}`);
+            }
+
+            await tryDecryption(response, successCallback, url);
+
+        } catch (error: any) {
+            failCallback(error);
+            const errorMessage = error?.message || error;
+            if (errorMessage.includes("timeout")) {
+                showErrorModal(url, errorMessage);
             }
             throw new Error(errorMessage);
         }

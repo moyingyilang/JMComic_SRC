@@ -1,32 +1,36 @@
-import { useState, useRef, useEffect } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { addListener, removeListener, launch } from "devtools-detector";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export const usePWAProtection = () => {
   const { t } = useTranslation();
   const hasCheckedRef = useRef(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || window.location.href.includes("devapp") || hasCheckedRef.current)
-      return;
+    if (hasCheckedRef.current) return;
     hasCheckedRef.current = true;
+
+    // const skipHosts = ["localhost", "devapp"];
+    const skipHosts = ["localhost"];
+
+    if (skipHosts.some((host) => window.location.hostname.includes(host))) return;
 
     const isInStandaloneMode = () => {
       const isStandaloneDisplay = window.matchMedia("(display-mode: standalone)").matches;
       const isIOSStandalone =
-        typeof navigator !== "undefined" && "standalone" in navigator && (navigator as any).standalone === true;
+        typeof navigator !== "undefined" && "standalone" in navigator && navigator.standalone === true;
 
       return isStandaloneDisplay || isIOSStandalone;
     };
 
     const isNativeApp = (window as any).__IS_NATIVE_APP__ === true || Capacitor.getPlatform() === "android";
 
+    // 非 PWA + 非 Native 才擋
     if (!isNativeApp && !isInStandaloneMode()) {
-      alert(t("modal.exit_app"));
-      window.location.href = "https://comicloveu.com/";
+      alert("此网址无法使用，请去官方网站下载App");
+      window.location.href = "/blocked";
     }
   }, []);
 };
@@ -36,31 +40,35 @@ export const useDevtoolsBlocker = () => {
   const hasBlockedRef = useRef(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || window.location.href.includes("devapp")) return;
+    // const skipHosts = ["localhost", "devapp"];
+    const skipHosts = ["localhost"];
 
-    const threshold = 160;
+    if (skipHosts.some((host) => window.location.hostname.includes(host))) return;
+
+    const threshold = 120;
     let checkInterval: NodeJS.Timeout;
 
-    const detectDevtools = () => {
-      const start = new Date().getTime();
-      debugger;
-      const end = new Date().getTime();
+    const triggerBlock = () => {
+      if (hasBlockedRef.current) return;
 
-      if (end - start > threshold) {
+      hasBlockedRef.current = true;
+      alert("此网址无法使用，请去官方网站下载App");
+      window.location.replace("/blocked");
+    };
+
+    const detectDebuggerDelay = () => {
+      const start = performance.now();
+      debugger;
+      const duration = performance.now() - start;
+
+      if (duration > threshold) {
         triggerBlock();
       }
     };
 
-    const triggerBlock = () => {
-      if (!hasBlockedRef.current) {
-        hasBlockedRef.current = true;
-        alert(t("modal.devtools_blocked"));
-        window.location.href = "https://comicloveu.com/";
-      }
-    };
-
-    const checkByConsoleTiming = () => {
+    const detectConsoleOpen = () => {
       const start = performance.now();
+
       console.log("%c", {
         get value() {
           const duration = performance.now() - start;
@@ -72,10 +80,14 @@ export const useDevtoolsBlocker = () => {
       });
     };
 
+    // 初始檢查
+    detectDebuggerDelay();
+    detectConsoleOpen();
+
     checkInterval = setInterval(() => {
-      detectDevtools();
-      checkByConsoleTiming();
-    }, 30000); // 每 30 秒偵測一次
+      detectDebuggerDelay();
+      detectConsoleOpen();
+    }, 5000);
 
     return () => {
       clearInterval(checkInterval);

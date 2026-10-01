@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { Slide, SlideProps, Snackbar, SnackbarContent } from "@mui/material";
+import { useState } from "react";
 
 function SlideTransition(props: SlideProps) {
   return <Slide {...props} direction="down" />;
@@ -64,7 +64,10 @@ export default function PositionedSnackbar({
   return (
     <>
       {[...snackbars].reverse().map((snackbar, index) => {
-        const baseTop = snackbar.marginTop ? `calc(${snackbar.marginTop} + ${index * 70}px)` : `${index * 70}px`;
+        const GAP = 70;
+        const baseTop = snackbar.marginTop
+          ? `calc(${snackbar.marginTop} + ${index * GAP}px)`
+          : `calc(max(env(safe-area-inset-top, 0px), 56px) + ${index * GAP}px)`;
         return (
           <Snackbar
             key={snackbar.key}
@@ -78,6 +81,7 @@ export default function PositionedSnackbar({
             anchorOrigin={{ vertical: "top", horizontal: "center" }}
             sx={{
               top: baseTop,
+              zIndex: 9999,
               "&.MuiSnackbar-root": {
                 maxWidth: "40%",
                 margin: "0 auto",
@@ -91,6 +95,9 @@ export default function PositionedSnackbar({
                 ...getSnackbarColor(snackbar.type),
                 borderRadius: "4px",
                 boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+                "& .MuiSnackbarContent-message": {
+                  whiteSpace: "pre-line",
+                },
               }}
             />
           </Snackbar>

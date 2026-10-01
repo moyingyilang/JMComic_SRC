@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import ComicList from "../Common/ComicList";
 import { FETCH_GET_WATCH_LIST_THUNK } from "../../actions/memberAction";
+import { useGlobalConfig } from "../../GlobalContext";
+import { useScrollToTop } from "../../Hooks";
 import { CLEAR_MEMBER_LIST, LOAD_MEMBER_LIST } from "../../reducers/memberReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import ClickPagination from "../Common/ClickPagination";
+import ComicList from "../Common/ComicList";
 
 const ReadList = (props: any) => {
   const { t, logined, setting, showSnackbar } = props;
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
+  const { config } = useGlobalConfig();
+  const { paginationMode } = config;
   const { watchList, isLoading } = useAppSelector((state) => state.member);
   const [dialogOpen, setDialogOpen] = useState({ folder: false });
-  const [page, setPage] = useState(1);
-  const pageLimit = watchList.list?.length ? Math.ceil(watchList.total / 20) : 0;
-  const hasNextPage = page <= pageLimit && pageLimit > 1;
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("watchLoadMore")) || 1);
+  const pageLimit = watchList.total ? Math.ceil(watchList.total / 20) : 1;
+  const hasNextPage = page < pageLimit && pageLimit > 1;
+
   const [editFolder, setEditFolder] = useState({
     edit: false,
     type: "",
@@ -31,20 +38,32 @@ const ReadList = (props: any) => {
     if (isRefreshing) {
       dispatch(CLEAR_MEMBER_LIST("watchList"));
     }
+    if (!isLoadMore) {
+      scrollToTop();
+    }
     setTimeout(() => {
       dispatch(FETCH_GET_WATCH_LIST_THUNK(page || 1));
     }, time || 0);
   };
 
   useEffect(() => {
-    if (logined && watchList.list?.length === 0) loadList();
+    if (logined && !watchList.list?.length) loadList();
   }, [logined, watchList.list?.length]);
 
   const handleLoadMore = () => {
     if (!hasNextPage) return;
     const nextPage = page + 1;
     setPage(nextPage);
+    sessionStorage.setItem("watchLoadMore", String(nextPage));
     loadList(true, false, 1000, nextPage);
+  };
+
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    setPage(targetPage);
+    sessionStorage.setItem("watchLoadMore", String(targetPage));
+    loadList(false, false, 0, targetPage);
   };
 
   return (
@@ -76,7 +95,9 @@ const ReadList = (props: any) => {
                 dialogOpen={dialogOpen}
                 showSnackbar={showSnackbar}
               />
-              {hasNextPage ? (
+              {paginationMode === "click" ? (
+                <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={isLoading} />
+              ) : hasNextPage ? (
                 <button onClick={handleLoadMore} className="w-11/12 bg-og rounded-sm text-white p-2">
                   {t("comic.load_more")}
                 </button>

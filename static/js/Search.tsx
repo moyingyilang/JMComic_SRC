@@ -1,40 +1,44 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { PullToRefreshify } from "react-pull-to-refreshify";
-import { useInView } from "react-intersection-observer";
-import { useTranslation } from "react-i18next";
-import CircularProgress from "@mui/material/CircularProgress";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import CloseIcon from "@mui/icons-material/Close";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import SearchIcon from "@mui/icons-material/Search";
-import CloseIcon from "@mui/icons-material/Close";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import CircularProgress from "@mui/material/CircularProgress";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useInView } from "react-intersection-observer";
+import { PullToRefreshify } from "react-pull-to-refreshify";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FETCH_HOT_TAGS_THUNK, FETCH_RECOMMEND_THUNK, FETCH_SEARCH_THUNK } from "../../actions/searchAction";
+import { SearchHelpData, SearchSortData, SearchTypeData } from "../../assets/JsonData";
+import AdComponent from "../../components/Ads/AdComponent";
+import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import ClickPagination from "../../components/Common/ClickPagination";
+import ComicList from "../../components/Common/ComicList";
+import HeaderAds from "../../components/Common/HeaderAds";
 import Loading from "../../components/Common/Loading";
 import TopBtn from "../../components/Common/TopBtn";
-import ComicList from "../../components/Common/ComicList";
-import MsgModal from "../../components/Modal/MsgModal";
 import DialogModal from "../../components/Modal/DialogModal";
-import AdComponent from "../../components/Ads/AdComponent";
-import { CLEAR_SEARCH_LIST, LOAD_SEARCH_LIST } from "../../reducers/searchReducer";
-import { FETCH_SEARCH_THUNK, FETCH_HOT_TAGS_THUNK, FETCH_RECOMMEND_THUNK } from "../../actions/searchAction";
-import { renderText } from "../../utils/Function";
-import { SearchHelpData, SearchSortData } from "../../assets/JsonData";
-import { defaultEditInitialState } from "../../utils/InterFace";
-import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import MsgModal from "../../components/Modal/MsgModal";
+import { useGlobalConfig } from "../../GlobalContext";
 import { useScrollToTop } from "../../Hooks";
+import { CLEAR_SEARCH_LIST, LOAD_SEARCH_LIST } from "../../reducers/searchReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { renderText } from "../../utils/Function";
+import { defaultEditInitialState } from "../../utils/InterFace";
 
 const Search = () => {
   const { config } = useGlobalConfig();
-  const { setting, logined } = config;
+  const { setting, logined, paginationMode } = config;
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
   const radioItems = t("search.radio_option", { returnObjects: true });
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const lastSyncedFilterRef = useRef<string | null>(null);
   const searchSort = SearchSortData();
   const searchHelp = SearchHelpData();
+  const searchType = SearchTypeData();
   const dispatch = useAppDispatch();
   const { searchList, hotTagsList, randomRecommendList, isLoading, isRefreshing } = useAppSelector(
     (state) => state.search
@@ -51,26 +55,78 @@ const Search = () => {
     const historyStored = localStorage.getItem("search");
     return historyStored ? JSON.parse(historyStored) : [];
   });
-  const randomNum = Math.floor(Math.random() * randomRecommendList?.length);
-  const randomItemId = randomRecommendList && randomRecommendList[randomNum]?.id;
-  const [page, setPage] = useState(1);
+  // const randomNum = Math.floor(Math.random() * randomRecommendList?.length);
+  // const randomItemId = randomRecommendList && randomRecommendList[randomNum]?.id;
+  const [page, setPage] = useState(() => {
+    const storedPage = sessionStorage.getItem("searchLoadMore");
+    return filter && filter === filterSerch && storedPage ? Number(storedPage) : 1;
+  });
   const { ref, inView } = useInView();
-  const pageLimit = searchList.list?.length > 0 ? Math.ceil(searchList.total / 80) : 0;
-  const hasNextPage = page <= pageLimit && pageLimit > 1;
-  const searchInitialState = { start: false, query: "", selected: "成人A漫", sort: searchSort[0] };
+  const pageLimit = searchList.total > 0 ? Math.ceil(searchList.total / 80) : 1;
+  const hasNextPage = page < pageLimit && pageLimit > 1;
+
+  const updatePage = useCallback((p: number) => {
+    setPage(p);
+    sessionStorage.setItem("searchLoadMore", String(p));
+  }, []);
+
+  // 用「已載入筆數 vs total」判斷是否還有下一頁，避免用假設的固定每頁筆數（80）換算頁數
+  // const hasNextPage = (searchList.list?.length || 0) > 0 && (searchList.list?.length || 0) < (searchList.total || 0);
+
+  const searchInitialState = {
+    start: false,
+    query: "",
+    selected: "成人A漫",
+    sort: searchSort[0],
+    search_type: "site",
+    year: "",
+    month: "",
+  };
+
   const [searchConfig, setSearchConfig] = useState(searchInitialState);
   const [editFolder, setEditFolder] = useState(defaultEditInitialState);
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: currentYear - 2017 + 1 }, (_, i) => currentYear - i);
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  // sort
+  const displayList = (() => {
+    let list = searchList.list || [];
+
+    // 由舊到新排序
+    if (searchConfig.sort.isLocalOldest) {
+      list = [...list].sort((a: any, b: any) => (a.adddate || "").localeCompare(b.adddate || ""));
+    }
+
+    return list;
+  })();
+
+  // 年份/月份篩選
+  const persistDateFilter = (year: string, month: string) => {
+    if (year || month) {
+      sessionStorage.setItem("searchDateFilter", JSON.stringify({ year, month }));
+    } else {
+      sessionStorage.removeItem("searchDateFilter");
+    }
+  };
+
+  // 掛載時把之前存在 sessionStorage 的搜尋偏好（排序、分類、年份/月份）還原回來
   useEffect(() => {
     const storedSortTitle = sessionStorage.getItem("searchSort");
-
-    if (!storedSortTitle) return;
-
     const matchedSort = searchSort.find((sortOption) => sortOption.title === storedSortTitle);
 
-    if (matchedSort) {
-      setSearchConfig((prevConfig) => ({ ...prevConfig, sort: matchedSort }));
+    const storedSearchType = sessionStorage.getItem("searchType");
+    const matchedType = searchType.find((typeOption) => typeOption.key === storedSearchType);
+
+    const storedDateFilter = sessionStorage.getItem("searchDateFilter");
+    const matchedDateFilter = storedDateFilter ? JSON.parse(storedDateFilter) : null;
+
+    if (matchedSort || matchedType || matchedDateFilter) {
+      setSearchConfig((prevConfig) => ({
+        ...prevConfig,
+        ...(matchedSort ? { sort: matchedSort } : {}),
+        ...(matchedType ? { search_type: matchedType.key } : {}),
+        ...(matchedDateFilter ? { year: matchedDateFilter.year, month: matchedDateFilter.month } : {}),
+      }));
     }
   }, []);
 
@@ -81,53 +137,76 @@ const Search = () => {
       page: number = 1,
       time: number = 0,
       search_query: string = searchConfig.query,
-      o: string = searchConfig.sort.key
+      o: string = searchConfig.sort.key,
+      search_type: string = searchConfig.search_type,
+      y: string = searchConfig.year,
+      m: string = searchConfig.month,
+      allowRedirect: boolean = false
     ) => {
       dispatch(LOAD_SEARCH_LIST({ isLoading: true, isLoadMore, isRefreshing }));
       if (!isLoadMore) {
-        setPage(1);
+        scrollToTop();
+        updatePage(1);
       }
       setTimeout(async () => {
-        const result = await dispatch(FETCH_SEARCH_THUNK({ search_query, o, page })).unwrap();
-        if (result.redirect_aid) {
+        const result = await dispatch(FETCH_SEARCH_THUNK({ search_query, o, page, search_type, y, m })).unwrap();
+        if (allowRedirect && result.redirect_aid) {
+          setSearchConfig((prev: any) => ({ ...prev, ...searchInitialState }));
+          sessionStorage.setItem("searchQuery", "redirect_aid");
           navigate(`/comic/detail?id=${result.redirect_aid}`);
+          return;
         }
       }, time);
     },
     [searchConfig]
   );
 
+  const handleDateFilterChange = (year: string, month: string) => {
+    const { query, sort, search_type } = searchConfig;
+    persistDateFilter(year, month);
+    loadList(false, false, 1, 0, query, sort.key, search_type, year, month);
+  };
+
   // tags & recommend
   useEffect(() => {
-    scrollToTop();
-    if (hotTagsList?.length === 0 && randomRecommendList?.length === 0) {
+    if (!hotTagsList?.length && !randomRecommendList?.length) {
+      scrollToTop();
       dispatch(FETCH_HOT_TAGS_THUNK());
       dispatch(FETCH_RECOMMEND_THUNK());
     }
-  }, [hotTagsList.length, randomRecommendList.length]);
+  }, [hotTagsList?.length, randomRecommendList?.length]);
 
   // detail tag filter
   // 排序 預設最新 mv最多點閱 mp最多圖片 tf最多愛心
 
   useEffect(() => {
-    if (filter === filterSerch) {
+    if (filter === lastSyncedFilterRef.current) return;
+    lastSyncedFilterRef.current = filter;
+
+    if (!filter || filter === "redirect_aid") {
+      setSearchConfig((prev: any) => ({ ...prev, ...searchInitialState }));
+      return;
+    }
+
+    // 同一個查詢字串且已經有快取結果時，只還原 UI 狀態，不必重打 API
+    if (filter === filterSerch && searchList.list?.length > 0) {
       setSearchConfig((prev: any) => ({ ...prev, start: true, query: filterSerch }));
       return;
     }
-    if (filter && filter !== searchConfig.query) {
-      handlerSearch(filter);
-    } else if (filter === "") {
-      setSearchConfig((prev: any) => ({ ...prev, ...searchInitialState }));
-    }
-  }, [filter]);
+
+    setSearchConfig((prev: any) => ({ ...prev, start: true, query: filter }));
+    loadList(false, false, 1, 0, filter, "");
+    handleSearchStorage(filter, "add");
+  }, [filter, searchList.list?.length]);
 
   // // search event
   const handlerSearch = (query: string, sort: string = "") => {
     if (searchConfig.selected === "成人A漫") {
-      setPage(1);
-      loadList(false, false, 1, 0, query, sort);
+      updatePage(1);
+      loadList(false, false, 1, 0, query, sort, searchConfig.search_type, searchConfig.year, searchConfig.month, true);
       setSearchConfig((prev: any) => ({ ...prev, start: true, query }));
       handleSearchStorage(query, "add");
+      lastSyncedFilterRef.current = query;
       navigate(`/search?filter=${encodeURIComponent(query)}`);
     } else {
       const selected = searchConfig.selected === "小電影" ? "movie" : "video";
@@ -171,10 +250,17 @@ const Search = () => {
     if (!hasNextPage) return;
     if (inView && hasNextPage) {
       const nextPage = page + 1;
-      setPage(nextPage);
+      updatePage(nextPage);
       loadList(true, false, nextPage, 1000);
     }
   }, [inView, hasNextPage]);
+
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    loadList(false, false, targetPage, 0);
+    updatePage(targetPage);
+  };
 
   useEffect(() => {
     loadMore();
@@ -185,7 +271,11 @@ const Search = () => {
     navigate(`/search`);
     sessionStorage.removeItem("searchQuery");
     sessionStorage.removeItem("searchSort");
+    sessionStorage.removeItem("searchType");
+    sessionStorage.removeItem("searchLoadMore");
+    sessionStorage.removeItem("searchDateFilter");
     setSearchConfig((prev: any) => ({ ...prev, ...searchInitialState }));
+    updatePage(1);
   };
 
   const backPath = () => {
@@ -200,8 +290,11 @@ const Search = () => {
   };
 
   return (
-    <div className="h-full">
+    <div className="h-full dark:bg-bk">
       {isLoading && searchConfig.start && <Loading />}
+      <div className="sticky top-safe z-50">
+        <HeaderAds />
+      </div>
       <div className="w-full bg-og text-white flex justify-between p-2">
         <div className="flex items-center w-1/12" onClick={backPath}>
           <ArrowBackIosNewIcon sx={{ stroke: "white", strokeWidth: 2 }} />
@@ -231,10 +324,10 @@ const Search = () => {
               />
             )}
           </div>
-          <div className="flex py-2">
+          <div className="flex justify-center items-center mt-2 py-2">
             {Array.isArray(radioItems) &&
               radioItems.map((d, i) => (
-                <div key={i} className="mr-4 mt-2">
+                <div key={i} className="mr-4">
                   <label>
                     <input
                       value={d}
@@ -249,15 +342,39 @@ const Search = () => {
                   </label>
                 </div>
               ))}
+            <div className="flex" onClick={() => setMsgOpen({ ...msgOpen, search: true })}>
+              <HelpOutlineIcon />
+              <span>{t("search.best_search_posture")}</span>
+            </div>
           </div>
-          <div className="flex" onClick={() => setMsgOpen({ ...msgOpen, search: true })}>
-            <HelpOutlineIcon />
-            <span>{t("search.best_search_posture")}</span>
+
+          <div className="flex flex-wrap justify-center items-center gap-2 py-1">
+            {searchType.map((d) => (
+              <div key={d.key} className="mr-4">
+                <label>
+                  <input
+                    value={d.key}
+                    type="radio"
+                    checked={searchConfig.search_type === d.key}
+                    onChange={() => {
+                      inputRef.current?.focus();
+                      setSearchConfig((prev: any) => ({ ...prev, search_type: d.key }));
+                      sessionStorage.setItem("searchType", d.key);
+                      // 已經有搜尋結果時，切換分類要立即用目前的關鍵字重新查詢
+                      if (searchConfig.start) {
+                        loadList(false, false, 1, 0, searchConfig.query, searchConfig.sort.key, d.key);
+                      }
+                    }}
+                  />
+                  {d.label}
+                </label>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {searchConfig.start && searchList.list?.length > 0 ? (
+      {searchConfig.start ? (
         <PullToRefreshify
           completeDelay={1000}
           refreshing={isRefreshing}
@@ -269,52 +386,98 @@ const Search = () => {
           <div className="bg-white w-full dark:bg-nbk">
             <div className="h-10 flex items-center p-2 pt-5">
               <p>
-                {t("search.search")}&nbsp;'{searchConfig.query}'&nbsp;共&nbsp;{searchList.total || 0}
+                {t("search.search")}&nbsp;'{searchConfig.query}'&nbsp;共&nbsp;
+                {searchList?.total >= 10000 ? "10000+" : searchList?.total || 0}
                 &nbsp;{t("search.results")}
               </p>
 
-              <button
-                className="ml-auto border-[1px] border-solid border-og py-1 px-1 rounded-md flex items-center dark:bg-nbk"
-                onClick={() => setDialogOpen({ ...dialogOpen, search: true })}
+              <select
+                className="ml-auto border-[1px] border-solid border-og py-1 px-1 rounded-md text-base dark:bg-nbk"
+                value={searchConfig.year}
+                onChange={(e) => {
+                  const year = e.target.value;
+                  setSearchConfig((prev: any) => ({ ...prev, year }));
+                  handleDateFilterChange(year, searchConfig.month);
+                }}
               >
-                {sessionStorage.getItem("searchSort") || searchConfig.sort.title}
-                <ArrowDropDownIcon />
-              </button>
+                <option value="">{t("search.all_years")}</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="ml-2 border-[1px] border-solid border-og py-1 px-1 rounded-md text-base dark:bg-nbk"
+                value={searchConfig.month}
+                onChange={(e) => {
+                  const month = e.target.value;
+                  setSearchConfig((prev: any) => ({ ...prev, month }));
+                  handleDateFilterChange(searchConfig.year, month);
+                }}
+              >
+                <option value="">{t("search.all_months")}</option>
+                {monthOptions.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+
+              {searchList.list?.length > 0 && (
+                <button
+                  className="ml-2 border-[1px] border-solid border-og py-1 px-1 rounded-md flex items-center dark:bg-nbk"
+                  onClick={() => setDialogOpen({ ...dialogOpen, search: true })}
+                >
+                  {sessionStorage.getItem("searchSort") || searchConfig.sort.title}
+                  <ArrowDropDownIcon />
+                </button>
+              )}
             </div>
-            <ComicList
-              t={t}
-              title="search"
-              link={true}
-              listName={"searchList"}
-              list={searchList.list}
-              logined={logined}
-              setting={setting}
-              comicTags={true}
-              comicMark={true}
-              comicCheck={false}
-              editFolder={editFolder}
-              setEditFolder={setEditFolder}
-              setDialogOpen={setDialogOpen}
-              dialogOpen={dialogOpen}
-              showSnackbar={showSnackbar}
-            />
-          </div>
-          <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40">
-            {hasNextPage ? (
-              <div className="flex items-center">
-                <CircularProgress color="inherit" size={12} />
-                <p className="ml-2">{t("comic.pull_to_load")}</p>
-              </div>
+
+            {searchList.list?.length > 0 ? (
+              <ComicList
+                t={t}
+                title="search"
+                link={true}
+                listName="searchList"
+                list={displayList}
+                logined={logined}
+                setting={setting}
+                comicTags={true}
+                comicMark={true}
+                comicCheck={false}
+                editFolder={editFolder}
+                setEditFolder={setEditFolder}
+                setDialogOpen={setDialogOpen}
+                dialogOpen={dialogOpen}
+                showSnackbar={showSnackbar}
+              />
             ) : (
-              <p className="text-center">{t("comic.no_more")}</p>
+              !isLoading && (
+                <div className="bg-white text-gy text-center py-5 dark:bg-nbk">{t("search.no_data_found")}</div>
+              )
             )}
-          </button>
+          </div>
+          {searchList.list?.length > 0 &&
+            (paginationMode === "click" ? (
+              <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={isLoading} />
+            ) : (
+              <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40">
+                {hasNextPage ? (
+                  <div className="flex items-center">
+                    <CircularProgress color="inherit" size={12} />
+                    <p className="ml-2">{t("comic.pull_to_load")}</p>
+                  </div>
+                ) : (
+                  <p className="text-center">{t("comic.no_more")}</p>
+                )}
+              </button>
+            ))}
         </PullToRefreshify>
       ) : (
         <div>
-          {!isLoading && searchConfig.start && searchList.list?.length === 0 && (
-            <div className="bg-white text-gy text-center py-5 dark:bg-nbk">{t("search.no_data_found")}</div>
-          )}
           <div className="bg-white mt-3 p-2 dark:bg-nbk">
             <p className="font-black">{t("search.popular_adult_topics")}</p>
             <div className="flex flex-wrap py-2">
@@ -371,13 +534,13 @@ const Search = () => {
               </div>
             </div>
           )}
-          <div className="bg-white mt-3 p-2 dark:bg-nbk">
+          <div className="bg-white mt-3 p-2 pb-20 dark:bg-nbk">
             <p className="font-black">{t("search.random_recommendation")}</p>
             <ComicList
               t={t}
               title="search"
               link={true}
-              smImgSize={true}
+              imgSize="sm"
               listName={"randomRecommendList"}
               list={randomRecommendList}
               logined={logined}
@@ -391,11 +554,11 @@ const Search = () => {
               dialogOpen={dialogOpen}
               showSnackbar={showSnackbar}
             />
-            <Link to={`/comic/detail?id=${randomItemId}`}>
+            {/* <Link to={`/comic/detail?id=${randomItemId}`}>
               <p className="text-og text-center py-5 border-y-[1px] border-solid border-tgy">
                 {t("search.random_recommendation")}
               </p>
-            </Link>
+            </Link> */}
           </div>
           <AdComponent adKey="app_search_bottom_jm3" />
         </div>

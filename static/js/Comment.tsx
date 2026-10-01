@@ -1,17 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { useInView } from "react-intersection-observer";
 import SendIcon from "@mui/icons-material/Send";
-import ForumList from "../Forum/ForumList";
-import DialogModal from "../../components/Modal/DialogModal";
-import { FETCH_FORUM_THUNK, FETCH_FORUM_SEND_THUNK } from "../../actions/forumAction";
-import { CLEAR_FORUM_LIST, LOAD_FORUM_LIST } from "../../reducers/forumReducer";
+import { Popover } from "@mui/material";
+import { useCallback, useEffect, useState } from "react";
+import { FETCH_FORUM_SEND_THUNK, FETCH_FORUM_THUNK } from "../../actions/forumAction";
 import { CommonQData } from "../../assets/JsonData";
+import NewTopicModal from "../../components/Modal/NewTopicModal";
+import { useScrollToTop } from "../../Hooks";
+import { CLEAR_FORUM_LIST, LOAD_FORUM_LIST } from "../../reducers/forumReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import ForumList from "../Forum/ForumList";
 
 const NewTopic = (props: any) => {
   const { t, logined, setDialogOpen, dialogOpen, responds } = props;
   return (
-    <div className="sticky bottom-0 bg-bbk h-20 flex items-center justify-center mt-10">
+    <div className="sticky bottom-0 bg-bbk h-20 flex items-center justify-center">
       <input
         type="text"
         maxLength={200}
@@ -29,79 +30,97 @@ const NewTopic = (props: any) => {
 };
 
 const Comment = (props: any) => {
-  const { t, logined, queryId, setting, dialogOpen, setDialogOpen, showSnackbar, bottomTopicInput, centerTopicInput } =
-    props;
+  const {
+    t,
+    logined,
+    queryId,
+    setting,
+    memberInfo,
+    dialogOpen,
+    setDialogOpen,
+    showSnackbar,
+    bottomTopicInput,
+    centerTopicInput,
+  } = props;
   const commonQ = CommonQData();
   const rulesContent = commonQ[2].text_section[0].content.slice(0, 7);
   const { forumList, isLoading } = useAppSelector((state) => state.forum);
   const dispatch = useAppDispatch();
-  const [responds, setResponds] = useState({ newTopic: "", spoilers: false, reply: "", activeIndex: null });
-  const { ref, inView } = useInView();
+  const scrollToTop = useScrollToTop();
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [page, setPage] = useState<number>(0);
-  const pageLimit = forumList.list?.length ? Math.ceil(forumList.total / 10) : 0;
-  const hasNextPage = page <= pageLimit;
+  const [responds, setResponds] = useState({
+    newTopic: "",
+    spoilers: false,
+    activeIndex: null,
+    comment: "",
+    comment_id: "",
+    aid: queryId,
+    recommendBN_input: "",
+    recommendBN: [],
+    recommendBN_empty: false,
+    recommendBN_exceed: false,
+  });
 
-  const loadList = (
-    isLoadMore: boolean = false,
-    isRefreshing: boolean = false,
-    time: number = 0,
-    mode: string = "all",
-    page: number = 1,
-    aid: string = queryId
-  ) => {
-    dispatch(LOAD_FORUM_LIST({ isLoading: true, isLoadMore, isRefreshing }));
-    if (!isLoadMore) {
-      dispatch(CLEAR_FORUM_LIST("forumList"));
-      setPage(1);
-    }
-    setTimeout(() => {
-      dispatch(FETCH_FORUM_THUNK({ mode, page, aid }));
-    }, time);
-  };
+  const loadList = useCallback(
+    (
+      isLoadMore: boolean = false,
+      isRefreshing: boolean = false,
+      mode: string = "all",
+      time: number = 0,
+      page: number = 1,
+      aid: string = queryId
+    ) => {
+      dispatch(LOAD_FORUM_LIST({ isLoading: true, isLoadMore, isRefreshing }));
+      if (isRefreshing) {
+        setPage(1);
+        dispatch(CLEAR_FORUM_LIST("forumList"));
+        sessionStorage.setItem("comicCommentsLoadMore", "1");
+      }
+      if (!isLoadMore) {
+        scrollToTop();
+      }
+      setTimeout(() => {
+        dispatch(FETCH_FORUM_THUNK({ mode, page, aid }));
+      }, time);
+    },
+    [dispatch, queryId]
+  );
 
-  // newTopic && reply
-  const handleSendRespond = async (comment: string, aid: string, comment_id?: string) => {
-    let result: Record<string, any> = {};
-    if (dialogOpen.newTopic && responds.newTopic !== "") {
-      result = await dispatch(FETCH_FORUM_SEND_THUNK({ comment, aid })).unwrap();
-    } else if (responds.reply !== "" && comment_id !== "") {
-      result = await dispatch(FETCH_FORUM_SEND_THUNK({ comment, aid, comment_id })).unwrap();
-    }
-    if (result.code === 200) {
-      const { msg, status } = result.data;
-      const type = status !== "ok" ? "error" : "success";
-      showSnackbar(msg, type);
-      setResponds((prev: any) => ({ ...prev, reply: "", newTopic: "" }));
-      setDialogOpen({ ...dialogOpen, newTopic: false });
+  // newTopic
+  const handleSendNewTopic = async () => {
+    const { newTopic, aid } = responds;
+    if (dialogOpen.newTopic && newTopic !== "") {
+      const result = await dispatch(FETCH_FORUM_SEND_THUNK({ comment: newTopic, aid })).unwrap();
+      if (result.code === 200) {
+        const { msg, status } = result.data;
+        const type = status !== "ok" ? "error" : "success";
+        showSnackbar(msg, type);
+        setResponds((prev: any) => ({ ...prev, newTopic: "", aid: "" }));
+        setDialogOpen({ ...dialogOpen, newTopic: false });
+        loadList(false, true);
+      }
     }
   };
 
   useEffect(() => {
     if (queryId) {
-      loadList();
+      loadList(false, true);
       sessionStorage.setItem("forumFrom", "detail");
     }
   }, [queryId]);
 
-  // load more
-  const loadMore = useCallback(() => {
-    if (!inView || !hasNextPage) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    loadList(true, false, 1000, "all", nextPage);
-  }, [inView, hasNextPage]);
-
-  useEffect(() => {
-    loadMore();
-  }, [inView]);
-
   return (
     <>
-      <div className="text-gy dark:text-tgy">
-        <div className="p-3 text-bbk dark:text-tgy">
-          {rulesContent.map((d: any) => (
-            <p key={d}>{d}</p>
-          ))}
+      <div className="text-gy dark:bg-bk dark:text-tgy">
+        <div className="bg-white flex justify-center text-bbk py-4 dark:text-tgy dark:bg-bbk">
+          {commonQ[2].text_section[0].content[0].slice(0, 3)}
+          <span>
+            <button onClick={(e) => setAnchorEl(e.currentTarget as HTMLElement)} className="text-og font-bold p-0 ml-1">
+              {commonQ[2].text_section[0].content[0].slice(3, 9)}
+            </button>
+          </span>
+          {commonQ[2].text_section[0].content[0].slice(9, 30)}
         </div>
         {centerTopicInput && (
           <NewTopic t={t} logined={logined} dialogOpen={dialogOpen} setDialogOpen={setDialogOpen} responds={responds} />
@@ -111,34 +130,58 @@ const Comment = (props: any) => {
             t={t}
             logined={logined}
             setting={setting}
+            memberInfo={memberInfo}
             list={forumList?.list}
             isLoading={isLoading}
             dialogOpen={dialogOpen}
             setDialogOpen={setDialogOpen}
             responds={responds}
             setResponds={setResponds}
-            handleSendRespond={handleSendRespond}
-            showReplySection={true}
-            hasNextPage={hasNextPage}
+            page={page}
+            setPage={setPage}
+            loadList={loadList}
+            showSnackbar={showSnackbar}
+            section="comic_comments"
+            pageStorageKey="comicCommentsLoadMore"
           />
-          {forumList?.list?.length > 0 && (
-            <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40"></button>
-          )}
         </>
       </div>
       {bottomTopicInput && (
         <NewTopic t={t} logined={logined} dialogOpen={dialogOpen} setDialogOpen={setDialogOpen} responds={responds} />
       )}
-      {dialogOpen.newTopic && (
-        <DialogModal
-          queryId={queryId}
-          setDialogOpen={setDialogOpen}
-          dialogOpen={dialogOpen}
-          responds={responds}
-          setResponds={setResponds}
-          handleSendRespond={handleSendRespond}
-        />
-      )}
+      {/*rules modal  */}
+      <Popover
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "center",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "center",
+        }}
+      >
+        <div className="p-3 text-gy dark:text-[#bbb] dark:bg-nbk">
+          <p className="border-b py-2"> {commonQ[3].text_section[0].content[0].slice(3, 9)}</p>
+          <div className="py-2">
+            {rulesContent.slice(1, 10).map((d: any) => (
+              <p key={d}>{d}</p>
+            ))}
+          </div>
+        </div>
+      </Popover>
+      <NewTopicModal
+        open={dialogOpen.newTopic}
+        dialogOpen={dialogOpen}
+        setDialogOpen={setDialogOpen}
+        responds={responds}
+        setResponds={setResponds}
+        handleSendNewTopic={handleSendNewTopic}
+        showSnackbar={showSnackbar}
+        queryId={queryId}
+      />
     </>
   );
 };

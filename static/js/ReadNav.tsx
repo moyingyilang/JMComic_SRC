@@ -45,13 +45,12 @@ const ReadNav = (props: any) => {
   const { favoriteList } = useAppSelector((state) => state.member);
   const [editFolder, setEditFolder] = useState(defaultEditInitialState);
   const isLikedItem = JSON.parse(localStorage.getItem("likedItems") || "[]");
-  const [favoriteSave, setFavoriteSave] = useState<{ like: string[]; mark: string[] }>(() => {
-    const storedLikes = localStorage.getItem("likedItems");
-    return {
-      like: storedLikes ? JSON.parse(storedLikes) : [],
-      mark: [],
-    };
-  });
+  const [addedMarks, setAddedMarks] = useState<Set<string>>(
+    () => new Set(JSON.parse(localStorage.getItem("addedMarks") || "[]"))
+  );
+  const [removedMarks, setRemovedMarks] = useState<Set<string>>(
+    () => new Set(JSON.parse(localStorage.getItem("removedMarks") || "[]"))
+  );
 
   // GetFolderList
   const handleFindFolder = () => {
@@ -60,19 +59,34 @@ const ReadNav = (props: any) => {
     dispatch(FETCH_FAVORITE_LIST_THUNK({ page: 1, folder_id, o }));
   };
 
-  // like && mark
-  const toggleFavoriteState = (type: "like" | "mark", id: string) => {
-    setFavoriteSave((prev: any) => {
-      const currentList = prev[type] || [];
-      const exists = currentList.includes(id);
-
-      const updatedList = exists ? currentList.filter((item: string) => item !== id) : [...currentList, id];
-
-      return {
-        ...prev,
-        [type]: updatedList,
-      };
-    });
+  const updateMarkState = (id: string, action: "add" | "remove") => {
+    if (action === "add") {
+      setAddedMarks((prev) => {
+        const s = new Set(prev);
+        s.add(id);
+        localStorage.setItem("addedMarks", JSON.stringify([...s]));
+        return s;
+      });
+      setRemovedMarks((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        localStorage.setItem("removedMarks", JSON.stringify([...s]));
+        return s;
+      });
+    } else {
+      setRemovedMarks((prev) => {
+        const s = new Set(prev);
+        s.add(id);
+        localStorage.setItem("removedMarks", JSON.stringify([...s]));
+        return s;
+      });
+      setAddedMarks((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        localStorage.setItem("addedMarks", JSON.stringify([...s]));
+        return s;
+      });
+    }
   };
 
   const handleEngagementAction = async (type: string, id: string) => {
@@ -95,7 +109,6 @@ const ReadNav = (props: any) => {
         setDialogOpen({ ...dialogOpen, login: true });
       } else {
         handleFindFolder();
-        toggleFavoriteState("mark", id);
         setEditFolder({ ...editFolder, aid: id });
         const result = await dispatch(FETCH_ADD_FAVORITE_THUNK(id)).unwrap();
         const { code, data } = result;
@@ -103,8 +116,13 @@ const ReadNav = (props: any) => {
           const msgType = data.status !== "ok" ? "error" : "success";
           showSnackbar(data.msg, msgType);
         }
-        if (data.status === "ok" && data.type === "add") {
-          setDialogOpen({ ...dialogOpen, folder: true });
+        if (data.status === "ok") {
+          if (data.type === "add" || data.type === "edit" || data.type === "move") {
+            updateMarkState(id, "add");
+            setDialogOpen({ ...dialogOpen, folder: true });
+          } else if (data.type === "remove") {
+            updateMarkState(id, "remove");
+          }
         }
       }
     }
@@ -135,7 +153,7 @@ const ReadNav = (props: any) => {
     <>
       <motion.nav
         initial={{ y: 0 }}
-        animate={{ y: closeNav ? 100 : 0 }}
+        animate={{ y: closeNav ? 200 : 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className={`fixed left-0 bottom-0 w-full bg-nbk bg-opacity-90 z-20`}
       >
@@ -190,7 +208,7 @@ const ReadNav = (props: any) => {
             <p>{t("detail.comments")}</p>
           </div>
           <div onClick={() => handleEngagementAction("mark", readId)}>
-            {readList.is_favorite ? (
+            {(readList.is_favorite && !removedMarks.has(readId)) || addedMarks.has(readId) ? (
               <BookmarkIcon className="text-og" />
             ) : (
               <BookmarkBorderIcon className="text-2xl text-white" />

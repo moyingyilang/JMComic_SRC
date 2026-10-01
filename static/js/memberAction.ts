@@ -1,10 +1,10 @@
 
 
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import HttpUtil from "../api/HttpUtil";
-import { GET_FAVORITE_LIST, GET_WATCH_LIST, GET_TRACKED_LIST, GET_NOTIFICATION_LIST, GET_TASK_LIST } from "../reducers/memberReducer";
 import { saveAuthData } from "../Hooks/useAuth";
 import { getApiEndpoint } from "../api/ApiEndpointUtil";
+import HttpUtil from "../api/HttpUtil";
+import { GET_ADS_PAYMENT, GET_FAVORITE_LIST, GET_NOTIFICATION_LIST, GET_TAG_BLOCK_SETTING, GET_TASK_LIST, GET_TRACKED_LIST, GET_WATCH_LIST } from "../reducers/memberReducer";
 
 // 會員登入/註冊/忘記密碼/登出
 export const FETCH_LOGIN_THUNK = createAsyncThunk(
@@ -141,6 +141,32 @@ export const FETCH_AD_FREE_THUNK = createAsyncThunk(
                 (response: any) => {
                     if (response.code === 200) {
                         res = response;
+                    }
+                },
+                (error: any) => {
+                    return new Error(error);
+                }
+            );
+            return res;
+        } catch (error) {
+            return rejectWithValue(error instanceof Error ? error.message : "數據獲取失敗");
+        }
+    }
+);
+
+export const FETCH_AD_FREE_PAY_THUNK = createAsyncThunk(
+    "AdFreePay/fetch",
+    async (params: { key?: string; pid?: string; uid?: string; }, { dispatch, rejectWithValue }) => {
+        try {
+            let res: Record<string, any> = {};
+
+            const url = getApiEndpoint("API_AD_FREE_PAY");
+
+            await HttpUtil.fetchGet(url, params,
+                (response: any) => {
+                    if (response.code === 200) {
+                        res = response;
+                        dispatch(GET_ADS_PAYMENT(response.data));
                     }
                 },
                 (error: any) => {
@@ -597,7 +623,7 @@ export const FETCH_EDIT_INFO_LIST_THUNK = createAsyncThunk(
 
 export const FETCH_GET_NOTIFICATIONS_LIST_THUNK = createAsyncThunk(
     "getNotificationsList/fetch",
-    async (params: { type?: string; page?: number; }, { dispatch, rejectWithValue }) => {
+    async (params: { type?: string; subType?: string; page?: number; }, { dispatch, rejectWithValue }) => {
         try {
             let res: Record<string, any> = {};
 
@@ -737,6 +763,55 @@ export const FETCH_NOTIFICATIONS_TRACK_LIST_THUNK = createAsyncThunk(
                         res = response;
                         dispatch(GET_TRACKED_LIST(response.data));
                     }
+                },
+                (error: any) => {
+                    return new Error(error);
+                }
+            );
+            return res;
+        } catch (error) {
+            return rejectWithValue(error instanceof Error ? error.message : "數據獲取失敗");
+        }
+    }
+);
+
+export const FETCH_TAG_BLOCK_SETTING_THUNK = createAsyncThunk(
+    "tagBlock/fetch",
+    async (params: { action?: string; tag?: []; }, { dispatch, rejectWithValue }) => {
+        try {
+            let res: Record<string, any> = {};
+
+            const url = getApiEndpoint("API_TAG_BLOCK_SETTING");
+
+            await HttpUtil.fetchGet(url, params,
+                (response: any) => {
+                    if (response.code === 200) {
+                        res = response;
+                        dispatch(GET_TAG_BLOCK_SETTING(response.data));
+                    }
+                },
+                (error: any) => {
+                    return new Error(error);
+                }
+            );
+            return res;
+        } catch (error) {
+            return rejectWithValue(error instanceof Error ? error.message : "數據獲取失敗");
+        }
+    }
+);
+
+export const FETCH_SEND_TAG_BLOCK_SETTING_THUNK = createAsyncThunk(
+    "sendTagBlock/fetch",
+    async (tag: string[], { dispatch, rejectWithValue }) => {
+        try {
+            let res: Record<string, any> = {};
+
+            const url = getApiEndpoint("API_TAG_BLOCK_SETTING");
+
+            await HttpUtil.fetchPostJson(url, { "tags": tag },
+                (response: any) => {
+                    res = response;
                 },
                 (error: any) => {
                     return new Error(error);

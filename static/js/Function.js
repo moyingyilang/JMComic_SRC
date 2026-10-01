@@ -1,6 +1,27 @@
-import md5 from "md5";
-import { t } from "i18next";
 import CryptoJS from "crypto-js";
+import { t } from "i18next";
+import md5 from "md5";
+
+// 產生簡單加法題目
+export const generateMathProblem = () => {
+  const num1 = Math.floor(Math.random() * 100) + 1;
+  const num2 = Math.floor(Math.random() * 10) + 1;
+
+  const problem = `${num1} + ${num2}`;
+  const answer = num1 + num2;
+
+  return {
+    problem,
+    answer: answer.toString(),
+  };
+};
+
+//數字轉日期時間
+export function formatTimestampToDate(timestamp) {
+  const validTimestamp = (timestamp || 0) * 1000;
+  const date = new Date(validTimestamp);
+  return date.toISOString().slice(0, 10);
+}
 
 // 分割陣列
 export const chunkArray = (arr, size) => {
@@ -10,16 +31,82 @@ export const chunkArray = (arr, size) => {
   }
   return result;
 };
-// 隨機item & index
+// 一般隨機item & index
 export function getRandomItems(arr, count = 1) {
   if (!Array.isArray(arr) || arr.length === 0) {
     return { items: [], indexes: [] };
   }
+  const shuffled = arr.map((item, index) => ({ item, index }));
+  // Fisher–Yates Shuffle
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const selected = shuffled.slice(0, Math.min(count, arr.length));
+  return {
+    items: selected.map((x) => x.item),
+    indexes: selected.map((x) => x.index),
+  };
+}
+
+// 廣告輪播隨機不重複
+const STORAGE_PREFIX = "carousel_start_pool_";
+
+export function getRandomAdsItems(arr, count = 1, groupKey = "default") {
+  if (!Array.isArray(arr) || arr.length === 0) {
+    return { items: [], indexes: [] };
+  }
+
   const maxCount = Math.min(count, arr.length);
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  const result = shuffled.slice(0, maxCount);
-  const indexes = result.map((item) => arr.indexOf(item));
-  return { items: result, indexes };
+  const startIndex = takeNextStartIndex(arr.length, groupKey);
+
+  // 其餘的 index 洗牌,並把 startIndex 排在最前面
+  const rest = shuffleIndexes(Array.from({ length: arr.length }, (_, i) => i).filter((i) => i !== startIndex));
+  const indexes = [startIndex, ...rest].slice(0, maxCount);
+  const items = indexes.map((i) => arr[i]);
+
+  return { items, indexes };
+}
+
+// 從「本輪尚未當過起點」的池子裡取一個 index;池子空了(或長度對不上)就重新洗一輪
+function takeNextStartIndex(length, groupKey) {
+  let pool = readPool(groupKey);
+
+  if (!Array.isArray(pool) || pool.length === 0 || pool.some((i) => i >= length)) {
+    pool = shuffleIndexes(Array.from({ length }, (_, i) => i));
+  }
+
+  const startIndex = pool.pop();
+  savePool(groupKey, pool);
+  return startIndex;
+}
+
+function storageKey(groupKey) {
+  return `${STORAGE_PREFIX}${groupKey}`;
+}
+
+function readPool(groupKey) {
+  if (typeof window === "undefined") return null;
+  try {
+    return JSON.parse(sessionStorage.getItem(storageKey(groupKey)));
+  } catch {
+    return null;
+  }
+}
+
+function savePool(groupKey, pool) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(storageKey(groupKey), JSON.stringify(pool));
+}
+
+// Fisher-Yates,真正均勻分佈的洗牌
+function shuffleIndexes(indexes) {
+  const arr = [...indexes];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 // 計算幾天前
@@ -30,6 +117,10 @@ export const getDateDiffFromNow = (time) => {
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   return diffDays;
+};
+
+export const formatDate = (date) => {
+  return date.replace("T", " ").replace(/\+08:00$/, "");
 };
 
 // yyyy/mm/dd 上午/下午 hh:mm:ss

@@ -1,12 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FETCH_GET_SETTINGS_THUNK } from "./actions/settingAction";
 import { useDispatch } from "react-redux";
-import { AppDispatch } from "./store";
-import { FETCH_ALL_ADS_THUNK } from "./actions/mainAction";
-import DarkModeToggle from "./components/Common/DarkModeToggle";
+import { FETCH_ALL_ADS_THUNK, FETCH_COVER_ADS_THUNK } from "./actions/mainAction";
 import { FETCH_LOGIN_THUNK } from "./actions/memberAction";
-import GlobalStore from "./config/GlobalStore";
+import { FETCH_GET_SETTINGS_THUNK } from "./actions/settingAction";
+import DarkModeToggle from "./components/Common/DarkModeToggle";
+import { AppDispatch } from "./store";
 
 interface GlobalConfig {
   hostReady: boolean;
@@ -16,11 +15,17 @@ interface GlobalConfig {
   app_img_shunt: string;
   express: string;
   darkMode: boolean;
+  paginationMode: "infinite" | "click";
+  langCode: string;
   lang: string;
   logined: boolean;
   error: string;
   ads: Record<string, any>;
+  adsContent: Record<string, any>;
   version: string;
+  oldAdsCache: string;
+  showdone: boolean;
+  defaultCoverImg: string;
 }
 
 const defaultConfig: GlobalConfig = {
@@ -30,12 +35,18 @@ const defaultConfig: GlobalConfig = {
   memberInfo: {},
   app_img_shunt: "1",
   express: "",
-  lang: "0",
+  langCode: "0",
+  lang: "TW",
   darkMode: false,
+  paginationMode: "infinite",
   logined: false,
   error: "",
   ads: {},
+  adsContent: {},
   version: "0.0.0",
+  oldAdsCache: "0",
+  showdone: false,
+  defaultCoverImg: "/images/cover_default.jpg",
 };
 
 const GlobalConfigContext = createContext<{
@@ -52,17 +63,20 @@ export const GlobalConfigProvider = ({ children }: any) => {
   const { i18n } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const [config, setConfig] = useState<GlobalConfig>(() => {
-    const imgSource = localStorage.getItem("imageSource") || "1";
+    const app_img_shunt = sessionStorage.getItem("imageSource") || "1";
     const memberInfo = JSON.parse(localStorage.getItem("memberInfo") as string) || defaultConfig.memberInfo;
     const logined = localStorage.getItem("jwttoken") !== null;
     const host = localStorage.getItem("apiUrl") || "";
+    const darkMode = localStorage.getItem("darkMode") === "true" || false;
+    const paginationMode = (localStorage.getItem("paginationMode") as "infinite" | "click") || "infinite";
     const ads = JSON.parse(localStorage.getItem("adsList") as string) || {};
-    return { ...defaultConfig, ads, host, imgSource, memberInfo, logined };
+    const adsContent = JSON.parse(localStorage.getItem("adsContent") as string) || {};
+    const oldAdsCache = localStorage.getItem("oldAdsCache") || "0";
+    return { ...defaultConfig, oldAdsCache, adsContent, ads, host, app_img_shunt, memberInfo, logined, darkMode, paginationMode };
   });
 
   const savedDarkMode = localStorage.getItem("darkMode");
-  const langStorage = localStorage.getItem("lang");
-  const lang = langStorage === "0" || config.setting?.is_cn === 0 ? "zh-TW" : "zh-CN";
+  const langStorage = localStorage.getItem("langCode");
 
   const [memberAccount, setMemberAccount] = useState(() => {
     const item = localStorage.getItem("memberAccount");
@@ -81,7 +95,7 @@ export const GlobalConfigProvider = ({ children }: any) => {
       ).unwrap();
 
       if (result.code === 200) {
-        setConfig((prev) => ({ ...prev, logined: true }));
+        setConfig((prev) => ({ ...prev, logined: true, memberInfo: result.data }));
       }
     } catch (err) {
       setConfig((prev) => ({ ...prev, logined: false }));
@@ -101,8 +115,17 @@ export const GlobalConfigProvider = ({ children }: any) => {
       setMemberAccount(item ? JSON.parse(item) : null);
     };
 
+    const handleAuthUpdated = (e: Event) => {
+      const { logined, memberInfo } = (e as CustomEvent).detail;
+      setConfig((prev) => ({ ...prev, logined, memberInfo }));
+    };
+
     window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    window.addEventListener("authUpdated", handleAuthUpdated);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("authUpdated", handleAuthUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -111,54 +134,69 @@ export const GlobalConfigProvider = ({ children }: any) => {
     } else {
       localStorage.setItem("darkMode", "false");
     }
+
     if (langStorage) {
-      setConfig({ ...config, lang: langStorage });
-      i18n.changeLanguage(lang);
+      setConfig({ ...config, langCode: langStorage, lang: langStorage === "1" ? "CN" : "TW" });
     } else {
-      localStorage.setItem("lang", "0");
+      localStorage.setItem("langCode", "0");
     }
-  }, []);
+    const langCode = langStorage === "1" ? "zh-CN" : "zh-TW";
+    const lang = langStorage === "1" ? "CN" : "TW";
+    localStorage.setItem("lang", lang);
+    i18n.changeLanguage(langCode);
+  }, [savedDarkMode]);
 
   useEffect(() => {
-    const { hostReady, host, setting, ads } = config;
-    const oldAdsCache = localStorage.getItem("oldAdsCache") || "";
-    if (
-      (!hostReady && host === "" && Object.keys(setting).length === 0) ||
-      (Object.keys(ads)?.length !== 0 && setting.ad_cache_version === Number(oldAdsCache))
-    ) {
-      return;
-    }
-    const getAds = async () => {
-      if (hostReady && setting.ipcountry) {
-        const ipcountry = setting.ipcountry;
-        const adsLang = config.setting?.is_cn === 0 ? "TW" : "CN";
+    const { hostReady, host, setting, ads, adsContent, lang, oldAdsCache, showdone } = config;
 
-        const data = await dispatch(
-          FETCH_ALL_ADS_THUNK({ lang: adsLang, ipcountry, v: setting.ad_cache_version })
-        ).unwrap();
-        if (data) {
-          setConfig((prev) => ({ ...prev, ads: data }));
-          localStorage.setItem("adsList", JSON.stringify(data));
-          localStorage.setItem("oldAdsCache", setting.ad_cache_version);
-        }
+    if ((!hostReady && host === "" && Object.keys(setting).length === 0) || showdone) return;
+
+    const { ad_cache_version: v } = setting;
+    if (!v) return;
+
+    const ipcountryChanged = !!setting.ipcountry && setting.ipcountry !== localStorage.getItem("adsIpcountry");
+
+    const cacheChanged = v !== Number(oldAdsCache);
+    const needAllAds = Object.keys(ads).length === 0 || cacheChanged || ipcountryChanged;
+    const needCoverAds = Object.keys(adsContent).length === 0 || cacheChanged || ipcountryChanged;
+    if (!needAllAds && !needCoverAds) return;
+
+    const getAds = async () => {
+      const adsList = await dispatch(FETCH_ALL_ADS_THUNK({ ipcountry: setting.ipcountry, v })).unwrap();
+      if (adsList) {
+        localStorage.setItem("adsList", JSON.stringify(adsList));
+        setConfig((prev) => ({ ...prev, ads: adsList }));
       }
     };
-    getAds();
-  }, [config.hostReady, config.setting]);
+    const getAdsContent = async () => {
+      const coverAds = await dispatch(FETCH_COVER_ADS_THUNK({ ipcountry: setting.ipcountry, v })).unwrap();
+      if (coverAds) {
+        localStorage.setItem("adsContent", JSON.stringify(coverAds));
+        setConfig((prev) => ({ ...prev, adsContent: coverAds }));
+      }
+    };
+    if (needAllAds) getAds();
+    if (needCoverAds) getAdsContent();
+    localStorage.setItem("oldAdsCache", String(v));
+    if (setting.ipcountry) localStorage.setItem("adsIpcountry", setting.ipcountry);
+  }, [config.hostReady, config.setting.ipcountry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!config.hostReady) return;
 
     const fetchSettingImgSource = async () => {
       try {
-        const { host, setting, app_img_shunt, express } = config;
+        const { setting, app_img_shunt, lang, showdone } = config;
         let info = setting;
-        if (Object.keys(setting).length === 0 || app_img_shunt) {
-          info = await dispatch(FETCH_GET_SETTINGS_THUNK({ app_img_shunt, express })).unwrap();
+
+        if (Object.keys(setting).length === 0 || app_img_shunt !== "0") {
+          info = await dispatch(FETCH_GET_SETTINGS_THUNK({ app_img_shunt, lang })).unwrap();
+          if (info?.ipcountry) localStorage.setItem("ipcountry", info.ipcountry);
           setConfig((prevConfig) => ({
             ...prevConfig,
-            setting: info || prevConfig.setting,
+            setting: showdone ? {} : info || prevConfig.setting,
             imgSource: app_img_shunt || prevConfig.app_img_shunt,
+            express: "",
           }));
         }
       } catch (error) {
@@ -166,7 +204,7 @@ export const GlobalConfigProvider = ({ children }: any) => {
       }
     };
     fetchSettingImgSource();
-  }, [config.hostReady, config.app_img_shunt]);
+  }, [config.hostReady, config.app_img_shunt, config.lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <GlobalConfigContext.Provider value={{ config, setConfig }}>

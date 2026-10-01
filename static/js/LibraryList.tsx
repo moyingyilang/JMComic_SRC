@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { FETCH_CREATOR_AUTHOR_WORK_THUNK } from "../../actions/creatorAction";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
 import TopBtn from "../../components/Common/TopBtn";
+import CreatorList from "../../components/Library/CreatorList";
+import SelectMenu from "../../components/Library/SelectMenu";
 import { useGlobalConfig } from "../../GlobalContext";
 import { GoBack, useScrollToTop } from "../../Hooks";
-import { FETCH_CREATOR_AUTHOR_WORK_THUNK } from "../../actions/creatorAction";
 import { LOAD_CREATOR_LIST } from "../../reducers/creatorReducer";
-import CreatorList from "../../components/Library/CreatorList";
-import Loading from "../../components/Common/Loading";
-import SelectMenu from "../../components/Library/SelectMenu";
-import { useTranslation } from "react-i18next";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 const LibraryList = () => {
   const { config } = useGlobalConfig();
@@ -48,8 +49,11 @@ const LibraryList = () => {
     <>
       {isLoading && <Loading />}
       <div className="h-full bg-defaultBg dark:bg-bk dark:text-tgy">
-        <div className="sticky top-0 h-16 bg-bbk flex items-end p-2 py-3 z-50">
-          <GoBack back="/library" />
+        <div className="sticky top-safe z-50">
+          <HeaderAds />
+          <div className="h-14 bg-bbk flex items-end p-2 py-3">
+            <GoBack back="/library" />
+          </div>
         </div>
         {list && setting && (
           <div
@@ -99,7 +103,13 @@ const LibraryList = () => {
         )}
         {list?.sponsor?.length > 0 &&
           list.sponsor.map((d: any, i: number) => (
-            <a key={i} href={d.platform_url} target="_blank" className="flex justify-center mt-5" rel="noreferrer">
+            <a
+              key={i}
+              href={d.platform_url.startsWith("http") ? d.platform_url : setting.main_web_host}
+              target="_blank"
+              className="flex justify-center mt-5"
+              rel="noreferrer"
+            >
               <button className="w-11/12 bg-og rounded p-3 text-left">
                 {t("library.support_author")} → {d.platform_name}
               </button>

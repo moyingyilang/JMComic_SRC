@@ -32,6 +32,17 @@ export const SearchSortData = () => {
     { title: t("cat_sort.mostViews"), key: "mv" },
     { title: t("cat_sort.mostImages"), key: "mp" },
     { title: t("cat_sort.mostHearts"), key: "tf" },
+    { title: t("cat_sort.oldest"), key: "old", isLocalOldest: true },
+  ];
+};
+
+export const SearchTypeData = () => {
+  return [
+    { key: "site", label: t("search.search_type_site") },
+    { key: "work", label: t("search.search_type_work") },
+    { key: "author", label: t("search.search_type_author") },
+    { key: "tag", label: t("search.search_type_tag") },
+    { key: "character", label: t("search.search_type_character") },
   ];
 };
 
@@ -42,7 +53,7 @@ export const CatSortData = () => {
     { title: t("cat_sort.totalRanking"), key: "mv" },
     { title: t("cat_sort.monthlyRanking"), key: "mv_m" },
     { title: t("cat_sort.weeklyRanking"), key: "mp_w" },
-    { title: t("cat_sort.dailyRanking"), key: "mp_t" },
+    // { title: t("cat_sort.dailyRanking"), key: "mp_t" },
   ];
 };
 
@@ -343,6 +354,7 @@ export const SettingLinkData = () => {
     {
       setting: [
         { title: t("setting.language"), name: t("setting.lang"), link: "#" },
+        { title: t("setting.pagination"), name: t("setting.switch_pagination"), link: "#" },
         { title: t("setting.switch_image_source"), name: t("setting.switch_image_source"), link: "#" },
         { title: t("setting.night_mode"), name: "", link: "#" },
       ],

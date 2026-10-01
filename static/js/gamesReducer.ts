@@ -85,6 +85,7 @@ const gamesSlice = createSlice({
             state.games = action.payload.games;
             state.hotGames = action.payload.hotGames;
             state.page = 1;
+            state.totalGames = Number(action.payload.games_total);
             state.categories = action.payload.categories;
             state.isLoading = false;
             state.isLoadMore = false;

@@ -1,9 +1,7 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { GET_MAIN_LIST, GET_LATEST_LIST, GET_MORE_LIST, GET_ADS, GET_COVER_LIST } from "../reducers/mainReducer";
-import HttpUtil from "../api/HttpUtil";
 import { getApiEndpoint } from "../api/ApiEndpointUtil";
-import apiPaths from "../api/apiPaths";
-import GlobalStore from "../config/GlobalStore";
+import HttpUtil from "../api/HttpUtil";
+import { GET_ADS, GET_COVER_LIST, GET_LATEST_LIST, GET_MAIN_LIST, GET_MORE_LIST } from "../reducers/mainReducer";
 
 export const FETCH_MAIN_THUNK = createAsyncThunk(
     "main/fetch",
@@ -127,21 +125,19 @@ export const FETCH_COIN_BUY_THUNK = createAsyncThunk(
 export const FETCH_COVER_ADS_THUNK = createAsyncThunk(
     "coverAds/fetch",
     async (
-        params: { lang?: string; ipcountry?: string; } = {},
+        params: { lang?: string; ipcountry?: string; v?: number; } = {},
         { dispatch, rejectWithValue }
     ) => {
-        const { lang = "TW", ipcountry = "TW" } = params;
+        const { ipcountry = "TW", v = "" } = params;
         try {
-            const baseUrl = getApiEndpoint("API_ADVERTISE_CONTENT_COVER");
-            const url = `${baseUrl}?lang=${lang}&ipcountry=${ipcountry}`;
+            const url = getApiEndpoint("API_ADVERTISE_CONTENT_COVER");
 
             const res: any = await new Promise((resolve) => {
-                HttpUtil.fetchGet(url, {},
+                HttpUtil.fetchGet(url, { ipcountry, v },
                     (response: any) => {
                         if (response.code === 200) {
                             resolve(response);
                             dispatch(GET_COVER_LIST(response.data));
-                            localStorage.setItem("adsContent", JSON.stringify(response.data));
                         }
                     },
                     (error: any) => {
@@ -162,13 +158,12 @@ export const FETCH_ALL_ADS_THUNK = createAsyncThunk(
         params: { adKey?: string; lang?: string; ipcountry?: string; v?: number; } = {},
         { dispatch, rejectWithValue }
     ) => {
-        const { adKey = "", lang = "TW", ipcountry = "TW", v = "" } = params;
+        const { adKey = "", ipcountry = "TW", v = "" } = params;
         try {
-            const baseUrl = getApiEndpoint("API_ADVERTISE_ALL");
-            const url = `${baseUrl}?lang=${lang}&ipcountry=${ipcountry}&v=${v}`;
+            const url = getApiEndpoint("API_ADVERTISE_ALL");
 
             const res: any = await new Promise((resolve) => {
-                HttpUtil.fetchGet(url, {},
+                HttpUtil.fetchGet(url, { ipcountry, v },
                     (response: any) => {
                         if (response.code === 200) {
                             const ads = response.data?.[adKey];

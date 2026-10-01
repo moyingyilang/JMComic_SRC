@@ -1,23 +1,38 @@
 import { Link } from "react-router-dom";
 
 const Series = (props: any) => {
-  const { t, queryId, seriesGroups, setSeriesGroups, msgOpen, handlerReadStorage, readHistory, setDialogOpen } = props;
+  const {
+    t,
+    queryId,
+    seriesGroups,
+    setSeriesGroups,
+    msgOpen,
+    handlerReadStorage,
+    readHistory,
+    setDialogOpen,
+    closeExpress,
+  } = props;
 
   return (
     <>
-      <div className="p-3 text-gy">
+      <div className="p-3 text-gy dark:bg-bk">
         {seriesGroups.menus.length > 0 ? (
           seriesGroups.menus.map((d: any, i: number) => (
             <div key={i}>
               <p
                 className={`flex border-[1px] border-solid border-[#ccc] rounded-md p-3 mb-4 ${
-                  seriesGroups.episode === i ? "bg-og text-white" : msgOpen?.detailDownload ? "bg-defaultBg" : ""
+                  seriesGroups.episode === i
+                    ? "bg-og text-white"
+                    : msgOpen?.detailDownload
+                    ? "bg-defaultBg dark:bg-bbk dark:text-tgy"
+                    : ""
                 }`}
                 onClick={() => {
                   setSeriesGroups((prev: any) => ({
                     ...prev,
                     episode: i,
                   }));
+                  closeExpress();
                 }}
               >
                 {t("detail.episode_prefix")}
@@ -41,6 +56,7 @@ const Series = (props: any) => {
                             currentChapterId: item.id,
                           }));
                           setDialogOpen((prev: any) => ({ ...prev, series: false }));
+                          closeExpress();
                         }}
                       >
                         <p
@@ -73,7 +89,7 @@ const Series = (props: any) => {
                       >
                         <p
                           className={`flex border-[1px] border-solid border-[#bbb] rounded-md p-3 ${
-                            seriesGroups.subEpisode === item.sort ? "bg-og text-white" : ""
+                            seriesGroups.subEpisode === item.sort ? "bg-og text-white" : "dark:bg-bbk dark:text-tgy"
                           }`}
                         >
                           {t("detail.episode_prefix")}

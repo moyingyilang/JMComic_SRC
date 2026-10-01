@@ -1,21 +1,27 @@
-import { useEffect, useState } from "react";
-import MenuItem from "@mui/material/MenuItem";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import ReplayIcon from "@mui/icons-material/Replay";
-import EditNoteIcon from "@mui/icons-material/EditNote";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditNoteIcon from "@mui/icons-material/EditNote";
+import ReplayIcon from "@mui/icons-material/Replay";
 import Button from "@mui/material/Button";
-import Menu from "@mui/material/Menu";
-import Fade from "@mui/material/Fade";
 import CircularProgress from "@mui/material/CircularProgress";
-import ComicList from "../Common/ComicList";
+import Fade from "@mui/material/Fade";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import { useEffect, useState } from "react";
 import { FETCH_FAVORITE_LIST_THUNK } from "../../actions/memberAction";
+import { useGlobalConfig } from "../../GlobalContext";
+import { useScrollToTop } from "../../Hooks";
 import { CLEAR_MEMBER_LIST, LOAD_MEMBER_LIST } from "../../reducers/memberReducer";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import ClickPagination from "../Common/ClickPagination";
+import ComicList from "../Common/ComicList";
 
 const MarkList = (props: any) => {
   const { t, setting, logined, showSnackbar } = props;
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
+  const { config } = useGlobalConfig();
+  const { paginationMode } = config;
   const { editResult, favoriteList, isLoading, isRefreshing } = useAppSelector((state) => state.member);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [dialogOpen, setDialogOpen] = useState({ folder: false });
@@ -32,8 +38,8 @@ const MarkList = (props: any) => {
     message: "",
     tags_select: "",
   });
-  const [page, setPage] = useState(1);
-  const pageLimit = favoriteList.list?.length ? Math.ceil(favoriteList.total / 20) : 0;
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("favoriteLoadMore")) || 1);
+  const pageLimit = favoriteList.total ? Math.ceil(favoriteList.total / 20) : 1;
   const hasNextPage = page < pageLimit && pageLimit > 1;
 
   // GetList
@@ -49,6 +55,9 @@ const MarkList = (props: any) => {
       setPage(1);
       dispatch(CLEAR_MEMBER_LIST("favoriteList"));
     }
+    if (!isLoadMore) {
+      scrollToTop();
+    }
     dispatch(LOAD_MEMBER_LIST({ isLoading: true, isLoadMore, isRefreshing }));
     setTimeout(() => {
       dispatch(FETCH_FAVORITE_LIST_THUNK({ page, folder_id, o }));
@@ -56,7 +65,7 @@ const MarkList = (props: any) => {
   };
 
   useEffect(() => {
-    if (logined && favoriteList.list?.length === 0) loadList();
+    if (logined && !favoriteList.list?.length) loadList();
   }, [logined, favoriteList.list?.length]);
 
   // Refresh
@@ -67,8 +76,18 @@ const MarkList = (props: any) => {
   const handleLoadMore = (nextPage: number) => {
     if (!hasNextPage) return;
     setPage(nextPage);
+    sessionStorage.setItem("favoriteLoadMore", String(nextPage));
     const { folder_id, o } = editFolder;
     loadList(true, false, 1000, nextPage, folder_id, o);
+  };
+
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    setPage(targetPage);
+    sessionStorage.setItem("favoriteLoadMore", String(targetPage));
+    const { folder_id, o } = editFolder;
+    loadList(false, false, 0, targetPage, folder_id, o);
   };
 
   return (
@@ -172,7 +191,7 @@ const MarkList = (props: any) => {
                 <span onClick={() => setEditFolder({ ...editFolder, edit: false, aid: "" })}>{t("member.cancel")}</span>
               </div>
             ) : (
-              <div className="w-6/12 flex justify-between items-center">
+              <div className="w-7/12 flex justify-between items-center">
                 <span
                   onClick={() => {
                     setDialogOpen({ ...dialogOpen, folder: true });
@@ -252,7 +271,9 @@ const MarkList = (props: any) => {
           />
           {isLoading && <img src="/images/loading.gif" alt="loading" width="80px" />}
           {favoriteList.list?.length > 0 &&
-            (hasNextPage ? (
+            (paginationMode === "click" ? (
+              <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={isLoading} />
+            ) : hasNextPage ? (
               <button
                 onClick={() => handleLoadMore(page + 1)}
                 className="w-11/12 rounded-sm text-white p-2 bg-og shadow-lg shadow-stone-700/50"

@@ -1,7 +1,7 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import HttpUtil from "../api/HttpUtil";
-import { GET_MOVIES_LIST } from "../reducers/moviesReducer";
 import { getApiEndpoint } from "../api/ApiEndpointUtil";
+import HttpUtil from "../api/HttpUtil";
+import { GET_EXCLUSIVE_LIST, GET_MOVIES_LIST } from "../reducers/moviesReducer";
 
 
 export const FETCH_MOVIES_LIST_THUNK = createAsyncThunk(
@@ -11,6 +11,7 @@ export const FETCH_MOVIES_LIST_THUNK = createAsyncThunk(
             page: number;
             search_query?: string;
             video_type?: string;
+            sub_category?: string;
         },
         { dispatch, rejectWithValue }
     ) => {
@@ -24,11 +25,18 @@ export const FETCH_MOVIES_LIST_THUNK = createAsyncThunk(
                     page: params.page,
                     search_query: params.search_query,
                     video_type: params.video_type,
+                    sub_category: params.sub_category,
                 },
                 (response: any) => {
                     if (response.code === 200) {
                         res = response;
-                        dispatch(GET_MOVIES_LIST(response.data));
+
+                        if (params.video_type === "movie_exclude") {
+                            dispatch(GET_EXCLUSIVE_LIST(res.data));
+                        } else {
+                            dispatch(GET_MOVIES_LIST(res.data));
+                        }
+
                     } else {
                         return new Error("返回數據格式不正確");
                     }
@@ -38,9 +46,7 @@ export const FETCH_MOVIES_LIST_THUNK = createAsyncThunk(
                 }
             );
 
-
             return res.data;
-
 
         } catch (error) {
             return rejectWithValue(error instanceof Error ? error.message : "數據獲取失敗");
@@ -57,13 +63,13 @@ export const FETCH_MOVIES_LIST_THUNK = createAsyncThunk(
 
 export const FETCH_LATEST_HANIME_THUNK = createAsyncThunk(
     "latestHanime/fetch",
-    async (params: {}, { rejectWithValue }) => {
+    async (_, { rejectWithValue }) => {
         try {
             let res: Record<string, any> = {};
 
             const url = getApiEndpoint("API_LATEST_HANIME");
 
-            await HttpUtil.fetchGet(url, params,
+            await HttpUtil.fetchGet(url, {},
                 (response: any) => {
                     if (response.code === 200) {
                         res = response.data;
@@ -119,3 +125,33 @@ export const FETCH_MOVIES_BANNERS_THUNK = createAsyncThunk(
     }
 );
 
+
+export const FETCH_BAITU_TOKEN_THUNK = createAsyncThunk(
+    "baituToken/fetch",
+    async (_, { dispatch, rejectWithValue }
+    ) => {
+        try {
+            let res: Record<string, any> = {};
+
+            const url = getApiEndpoint("API_BAITU_CREATE_TOKEN");
+
+            await HttpUtil.fetchGet(url, {},
+                (response: any) => {
+                    if (response.code === 200) {
+                        res = response;
+                    } else {
+                        return new Error("返回數據格式不正確");
+                    }
+                },
+                (error: any) => {
+                    return new Error(error);
+                }
+            );
+
+            return res;
+
+        } catch (error) {
+            return rejectWithValue(error instanceof Error ? error.message : "數據獲取失敗");
+        }
+    }
+);

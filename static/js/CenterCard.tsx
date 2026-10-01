@@ -1,12 +1,12 @@
-import QrCodeIcon from "@mui/icons-material/QrCode";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
-import { PullToRefreshify } from "react-pull-to-refreshify";
-import { ReactNode } from "react";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import { styled, keyframes } from "@mui/material/styles";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
+import QrCodeIcon from "@mui/icons-material/QrCode";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { keyframes, styled } from "@mui/material/styles";
+import { ReactNode } from "react";
 import type { PullStatus } from "react-pull-to-refreshify";
+import { PullToRefreshify } from "react-pull-to-refreshify";
 
 const CenterCard = (props: any) => {
   const {
@@ -24,6 +24,8 @@ const CenterCard = (props: any) => {
     msgOpen,
     isInfoRefreshing,
     handleRefresh,
+    stickyTop = 0,
+    stickyRef,
   } = props;
 
   // 自定義旋轉動畫
@@ -58,9 +60,13 @@ const CenterCard = (props: any) => {
 
   return (
     <>
-      <div className="bg-nbk sticky top-0 flex justify-center items-center text-xl h-28 z-50">
-        {scrollUp ? (
-          !logined ? (
+      <div ref={stickyRef} className="bg-nbk sticky flex flex-col z-30" style={{ top: stickyTop }}>
+        <div
+          className={`w-full flex justify-center items-end text-xl overflow-hidden transition-[height,opacity] duration-500 ease-in-out ${
+            !logined || scrollUp ? "h-[110px] opacity-100" : "h-0 opacity-0 pointer-events-none"
+          }`}
+        >
+          {!logined ? (
             <span>{t("login.please_login")}</span>
           ) : (
             <div className="w-7/12 flex flex-wrap justify-around items-center text-base">
@@ -107,14 +113,14 @@ const CenterCard = (props: any) => {
                 </p>
               </div>
             </div>
-          )
-        ) : null}
+          )}
+        </div>
       </div>
       <PullToRefreshify
         completeDelay={1000}
         refreshing={isInfoRefreshing}
-        onRefresh={handleRefresh}
-        renderText={renderIcon}
+        onRefresh={logined ? handleRefresh : () => {}}
+        renderText={logined ? renderIcon : () => null}
       >
         <div className="flex flex-col mb-4">
           {logined ? (
@@ -131,7 +137,7 @@ const CenterCard = (props: any) => {
                 />
                 <QrCodeIcon sx={{ fontSize: 22 }} className="absolute right-0 top-1/2 transform -translate-y-2" />
               </div>
-              <div className="h-20 flex flex-col justify-around">
+              <div className="h-24 flex flex-col justify-around">
                 <p>
                   Hi! {infoData.username}&nbsp;·<span className="text-og ml-1">{infoData.level_name}</span>
                 </p>
@@ -161,24 +167,29 @@ const CenterCard = (props: any) => {
                       />
                     ))}
                 </p>
-                <p>
+                <div className="mb-4">
                   {t("member_card.status")}：
                   <span className="text-og ml-2">
                     {infoData.ad_free ? t("member_card.super_JM_person") : t("member_card.JM_person")}
                   </span>
-                  <span className="bg-bbk rounded-full ml-4 p-2 text-t08">{infoData.ad_free_before}</span>
-                </p>
+                  <p>
+                    {t("member_card.ad_free_expires")}
+                    <span className="bg-bbk rounded-full ml-4 p-2 text-t08">{infoData.ad_free_before}</span>
+                  </p>
+                </div>
               </div>
             </div>
           ) : (
-            <div className="text-center text-xl pb-20 z-10">
-              <button
-                className="px-4 py-2 rounded-md border-2 border-solid border-stone-900 bg-og"
-                onClick={() => setDialogOpen({ ...dialogOpen, login: true })}
-              >
-                {t("login.login_register")}
-              </button>
-            </div>
+            !isInfoRefreshing && (
+              <div className="text-center text-xl pb-20 z-10">
+                <button
+                  className="px-4 py-2 rounded-md border-2 border-solid border-stone-900 bg-og"
+                  onClick={() => setDialogOpen({ ...dialogOpen, login: true })}
+                >
+                  {t("login.login_register")}
+                </button>
+              </div>
+            )
           )}
           <div className="w-11/12 bg-bbk rounded-md mx-auto text-[#bbb]">
             <ul className="flex justify-around items-center">
@@ -239,10 +250,16 @@ const CenterCard = (props: any) => {
                   {t("member_card.promote_charging")}
                 </button>
                 <button
-                  className="rounded-md bg-og text-white p-1 px-2 ml-6"
+                  className="rounded-md bg-og text-white p-1 px-2 ml-2"
                   onClick={() => logined && setDialogOpen({ ...dialogOpen, invincible: true })}
                 >
                   {t("member_card.activate_invincibility")}
+                </button>
+                <button
+                  className="rounded-md bg-og text-white p-1 px-2 ml-2"
+                  onClick={() => logined && handleRefresh()}
+                >
+                  {t("member_card.refresh_cache")}
                 </button>
               </div>
               <div className="flex text-og" onClick={() => setMsgOpen({ ...msgOpen, member: true })}>

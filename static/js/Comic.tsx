@@ -1,29 +1,31 @@
-import { useEffect, useState, useRef, useCallback } from "react";
-import { useLocation } from "react-router-dom";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { PullToRefreshify } from "react-pull-to-refreshify";
-import { useInView } from "react-intersection-observer";
-import { useTranslation } from "react-i18next";
-import { motion } from "framer-motion";
 import CircularProgress from "@mui/material/CircularProgress";
-import ComicList from "../../components/Common/ComicList";
-import TopBtn from "../../components/Common/TopBtn";
-import Loading from "../../components/Common/Loading";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useInView } from "react-intersection-observer";
+import { PullToRefreshify } from "react-pull-to-refreshify";
+import { useLocation } from "react-router-dom";
 import { FETCH_MORE_THUNK, FETCH_SER_MORE_THUNK } from "../../actions/mainAction";
-import { CLEAR_MAIN_LIST, LOAD_MORE_LIST } from "../../reducers/mainReducer";
-import { getWeekInfo, renderText } from "../../utils/Function";
 import { ComicType } from "../../assets/JsonData";
-import { GoBack } from "../../Hooks";
-import { defaultEditInitialState } from "../../utils/InterFace";
 import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import ClickPagination from "../../components/Common/ClickPagination";
+import ComicList from "../../components/Common/ComicList";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
+import TopBtn from "../../components/Common/TopBtn";
+import { useGlobalConfig } from "../../GlobalContext";
+import { GoBack, useScrollToTop } from "../../Hooks";
+import { LOAD_MORE_LIST } from "../../reducers/mainReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { getWeekInfo, renderText } from "../../utils/Function";
+import { defaultEditInitialState } from "../../utils/InterFace";
 
 const Comic = () => {
   const { config } = useGlobalConfig();
-  const { setting, logined } = config;
+  const { setting, logined, paginationMode } = config;
   const { t } = useTranslation();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
   const comicType = ComicType();
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
   const weekDayItems = t("comic.weekDays", { returnObjects: true });
@@ -41,10 +43,15 @@ const Comic = () => {
   const [editFolder, setEditFolder] = useState(defaultEditInitialState);
   const [page, setPage] = useState<number>(0);
   const { ref, inView } = useInView();
-  const pageLimit = moreList.list?.length ? Math.ceil(moreList.total / 30) : 0;
-  const hasNextPage = page <= pageLimit;
+  const defaultPageLimit: Record<string, number> = { "30": 8, "29": 100, "26": 2 };
+  const pageLimit = moreList.total ? Math.ceil(moreList.total / 30) : defaultPageLimit[queryId] ?? 1;
+  // page 是 0-indexed（第一頁是 0），pageLimit 是總頁數，最後一頁的 index 是 pageLimit - 1
+  const hasNextPage = page < pageLimit - 1;
 
   const handleLoad = (isMoreListLoadMore: boolean, isMoreListRefreshing: boolean) => {
+    if (!isMoreListLoadMore) {
+      scrollToTop();
+    }
     dispatch(LOAD_MORE_LIST({ isMoreListLoading: true, isMoreListLoadMore, isMoreListRefreshing }));
   };
 
@@ -71,6 +78,21 @@ const Comic = () => {
   useEffect(() => {
     loadMore();
   }, [loadMore]);
+
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit) - 1;
+    setPage(targetPage);
+    handleLoad(false, false);
+    if (queryId) {
+      dispatch(FETCH_MORE_THUNK({ id: queryId, page: targetPage }));
+    }
+  };
+
+  const goToWeeklyPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    setFilter((prev) => ({ ...prev, page: targetPage }));
+  };
 
   useEffect(() => {
     if (isWeekly) {
@@ -100,9 +122,10 @@ const Comic = () => {
   return (
     <>
       {isMoreListLoading && <Loading />}
-      <div className="h-full transition-all duration-300 dark:text-tgy">
-        <header className="bg-bbk fixed top-0 top-safe left-0 right-0 z-50">
-          <div className="h-20 w-full bg-bbk text-white flex items-end px-2 py-3">
+      <div className="h-full transition-all duration-300 dark:text-tgy dark:bg-bk">
+        <header className="bg-bbk fixed top-safe left-0 right-0 z-50">
+          <HeaderAds />
+          <div className="h-14 w-full bg-bbk text-white flex items-end px-2 py-3">
             <GoBack back="/" />
             <p className="ml-4 text-2xl text-og">{isWeekly ? t("comic.weekly_update") : query}</p>
           </div>
@@ -165,22 +188,38 @@ const Comic = () => {
               isWeekly={isWeekly}
             />
             {!isWeekly ? (
-              <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40">
-                {moreList.list?.length > 0 &&
-                  (hasNextPage ? (
-                    <div className="flex items-center">
-                      <CircularProgress color="inherit" size={12} />
-                      <p className="ml-2">{t("comic.pull_to_load")}</p>
-                    </div>
-                  ) : (
-                    <p className="text-center">{t("comic.no_more")}</p>
-                  ))}
-              </button>
+              moreList.list?.length > 0 && paginationMode === "click" ? (
+                <ClickPagination
+                  pageLimit={pageLimit}
+                  page={page + 1}
+                  onChange={goToPage}
+                  loading={isMoreListLoading}
+                />
+              ) : (
+                <button ref={ref} onClick={loadMore} className="w-full flex justify-center pb-40">
+                  {moreList.list?.length > 0 &&
+                    (hasNextPage ? (
+                      <div className="flex items-center">
+                        <CircularProgress color="inherit" size={12} />
+                        <p className="ml-2">{t("comic.pull_to_load")}</p>
+                      </div>
+                    ) : (
+                      <p className="text-center">{t("comic.no_more")}</p>
+                    ))}
+                </button>
+              )
             ) : (
               <div className="w-full flex justify-center py-10">
                 {moreList.list?.length > 0 &&
                   (moreList.error ? (
                     <p className="text-center">{t("comic.end_of_list")}</p>
+                  ) : paginationMode === "click" ? (
+                    <ClickPagination
+                      pageLimit={pageLimit}
+                      page={filter.page}
+                      onChange={goToWeeklyPage}
+                      loading={isMoreListLoading}
+                    />
                   ) : (
                     <button
                       className="rounded bg-og w-36 h-12 dark:bg-nbk text-white"

@@ -1,22 +1,23 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
+import { getApiEndpoint } from "../api/ApiEndpointUtil";
 import HttpUtil from "../api/HttpUtil";
 import { decryptData } from "../utils/Function";
-import { getApiEndpoint } from "../api/ApiEndpointUtil";
 
 export const FETCH_GET_SETTINGS_THUNK = createAsyncThunk(
   "getSettings/fetch",
-  async (params: { app_img_shunt: string, express?: string; }, { dispatch, rejectWithValue }) => {
+  async (params: { app_img_shunt: string; lang?: string; }, { dispatch, rejectWithValue }) => {
     try {
-      const { app_img_shunt, express } = params;
+      const { app_img_shunt, lang } = params;
 
       const url = getApiEndpoint("API_APP_SETTING");
 
       let res: Record<string, any> = {};
-      await HttpUtil.fetchGet(url, { app_img_shunt, express },
+      await HttpUtil.fetchGet(url, { app_img_shunt, lang, t: Math.floor(Date.now() / 1000) },
         (response: any) => {
           if (response.code === 200) {
             res = response;
             localStorage.setItem("main_web_host", response.data.main_web_host);
+
           }
         },
         (error: any) => {
@@ -38,7 +39,7 @@ export const FETCH_SETTINGS_THUNK = createAsyncThunk(
 
       const url = getApiEndpoint("API_APP_SETTING");
 
-      await HttpUtil.fetchPost(url, { language },
+      await HttpUtil.fetchPost(url, { language, t: Math.floor(Date.now() / 1000) },
         (response: any) => {
           if (response.code === 200) {
             res = response;

@@ -1,29 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import SearchIcon from "@mui/icons-material/Search";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import ClickPagination from "../../components/Common/ClickPagination";
+import TopBtn from "../../components/Common/TopBtn";
 import Content from "../../components/Games/Content";
 import BottomNav from "../../components/Main/BottomNav";
-import TopBtn from "../../components/Common/TopBtn";
-import AdComponent from "../../components/Ads/AdComponent";
-import SearchIcon from "@mui/icons-material/Search";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
-import { FETCH_GAMES_LIST_THUNK, FETCH_BANNERS_THUNK, FETCH_CATEGORIES_THUNK } from "../../actions/gamesAction";
-import { CLEAR_GAMES_LIST, RESET_GAMES_STATE, CLEAR_GAMES_BANNERS } from "../../reducers/gamesReducer";
+import { FETCH_CATEGORIES_THUNK, FETCH_GAMES_LIST_THUNK } from "../../actions/gamesAction";
+import { CLEAR_GAMES_LIST, RESET_GAMES_STATE } from "../../reducers/gamesReducer";
 
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Pagination, Autoplay } from "swiper/modules";
-import { useGlobalConfig } from "../../GlobalContext";
-import { PullToRefreshify } from "react-pull-to-refreshify";
-import { renderText } from "../../utils/Function";
-import Header from "../../components/Common/Header";
 import { useTranslation } from "react-i18next";
+import { PullToRefreshify } from "react-pull-to-refreshify";
+import { Autoplay, Pagination } from "swiper/modules";
+import { Swiper, SwiperSlide } from "swiper/react";
+import Header from "../../components/Common/Header";
+import { useGlobalConfig } from "../../GlobalContext";
+import { useScrollToTop } from "../../Hooks";
+import { renderText } from "../../utils/Function";
 
 const Games: React.FC = () => {
   const dispatch = useAppDispatch();
   const { config } = useGlobalConfig();
-  const { setting } = config;
+  const { setting, paginationMode } = config;
+  const scrollToTop = useScrollToTop();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { games, hotGames, categories, isLoading, isLoadMore, hasMore, bannerList } = useAppSelector(
+  const { games, totalGames, hotGames, categories, isLoading, isLoadMore, hasMore, bannerList } = useAppSelector(
     (state) => state.games
   );
 
@@ -36,12 +38,20 @@ const Games: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [committedText, setCommittedText] = useState("");
   const [searching, setSearching] = useState(false);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("gamesLoadMore")) || 1);
   const [hasInitLoaded, setHasInitLoaded] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const observerLockRef = useRef(false);
   const loadMoreRef = useRef(null);
   const hasLoadedOnce = useRef(false);
   const { t } = useTranslation();
+  const GAMES_PAGE_SIZE = 18;
+  const pageLimit = totalGames ? Math.ceil(totalGames / GAMES_PAGE_SIZE) : 1;
+
+  const updatePage = (value: number) => {
+    setPage(value);
+    sessionStorage.setItem("gamesLoadMore", String(value));
+  };
 
   sessionStorage.setItem("fromPage", `${window.location.pathname}`);
   interface CategoryItem {
@@ -65,8 +75,23 @@ const Games: React.FC = () => {
     [dispatch, committedText, selectedSlug, subCategorySlug]
   );
 
+  const enterSearchMode = () => {
+    setSearching(true);
+    setSearchText("");
+    setCommittedText("");
+  };
+
+  const handleSearchSubmit = async () => {
+    updatePage(1);
+    setHasInitLoaded(false);
+    dispatch(RESET_GAMES_STATE());
+
+    await loadGameList(1, false);
+    setHasInitLoaded(true);
+  };
+
   const handleCategoryClick = useCallback(
-    (item: CategoryItem): void => {
+    (item: CategoryItem, initialPage: number = 1): void => {
       setSearching(false);
       setSelectedCategory(item.name);
       setSelectedSlug(item.slug);
@@ -74,10 +99,10 @@ const Games: React.FC = () => {
       setSubCategorySlug("");
       setIsMenuVisible(true);
       setCommittedText("");
-      setPage(1);
+      updatePage(initialPage);
       setHasInitLoaded(false);
       dispatch(CLEAR_GAMES_LIST());
-      loadGameList(1, false, item.slug, "", "").then(() => setHasInitLoaded(true));
+      loadGameList(initialPage, false, item.slug, "", "").then(() => setHasInitLoaded(true));
       sessionStorage.setItem("selectedCategory", item.name);
     },
     [dispatch, loadGameList]
@@ -87,7 +112,7 @@ const Games: React.FC = () => {
     (item: CategoryItem): void => {
       setIsSubMenuSelect(item.name);
       setSubCategorySlug(item.slug);
-      setPage(1);
+      updatePage(1);
       setHasInitLoaded(false);
       dispatch(CLEAR_GAMES_LIST());
       loadGameList(1, false, selectedSlug, item.slug).then(() => setHasInitLoaded(true));
@@ -101,7 +126,7 @@ const Games: React.FC = () => {
     setCommittedText("");
     setIsSubMenuSelect("");
     setSubCategorySlug("");
-    setPage(1);
+    updatePage(1);
     setHasInitLoaded(false);
     dispatch(CLEAR_GAMES_LIST());
     if (categories.length > 0) {
@@ -121,14 +146,14 @@ const Games: React.FC = () => {
       setSubCategorySlug("");
       setIsMenuVisible(false);
       setCommittedText(searchText);
-      setPage(1);
+      updatePage(1);
       setHasInitLoaded(false);
       dispatch(CLEAR_GAMES_LIST());
       loadGameList(1, false, "", "", searchText).then(() => setHasInitLoaded(true));
     }
   };
   const handleRefresh = () => {
-    setPage(1);
+    updatePage(1);
     setHasInitLoaded(false);
     dispatch(CLEAR_GAMES_LIST());
     setIsRefreshing(true);
@@ -138,12 +163,26 @@ const Games: React.FC = () => {
     });
   };
 
+  // click pagination
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    if (targetPage === page || pageLoading) return;
+    updatePage(targetPage);
+    setPageLoading(true);
+    scrollToTop();
+    loadGameList(targetPage, false).finally(() => setPageLoading(false));
+  };
+
   useEffect(() => {
-    if (hasInitLoaded) {
+    if (hasInitLoaded && paginationMode !== "click") {
       const observer = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting && hasMore && !isLoadMore && !observerLockRef.current) {
           observerLockRef.current = true;
-          setPage((prev) => prev + 1);
+          setPage((prev) => {
+            const next = prev + 1;
+            sessionStorage.setItem("gamesLoadMore", String(next));
+            return next;
+          });
         }
       });
       const currentRef = loadMoreRef.current;
@@ -153,7 +192,7 @@ const Games: React.FC = () => {
         observer.disconnect();
       };
     }
-  }, [hasInitLoaded, hasMore, isLoadMore]);
+  }, [hasInitLoaded, hasMore, isLoadMore, paginationMode]);
 
   useEffect(() => {
     const category = categories.find((cat) => cat.name === selectedCategory);
@@ -170,9 +209,9 @@ const Games: React.FC = () => {
   useEffect(() => {
     if (categories.length > 0 && !selectedCategory && !hasLoadedOnce.current && games.length === 0) {
       hasLoadedOnce.current = true;
-      handleCategoryClick(categories[0]);
+      handleCategoryClick(categories[0], page);
     }
-  }, [categories, selectedCategory, handleCategoryClick, games.length]);
+  }, [categories, selectedCategory, handleCategoryClick, games.length, page]);
 
   useEffect(() => {
     if (categories.length === 0) {
@@ -192,12 +231,12 @@ const Games: React.FC = () => {
   }, [dispatch, setting, bannerList.length]);
 
   useEffect(() => {
-    if (page > 1) {
+    if (page > 1 && paginationMode !== "click") {
       loadGameList(page, true).then(() => {
         observerLockRef.current = false;
       });
     }
-  }, [page, loadGameList]);
+  }, [page, loadGameList, paginationMode]);
 
   return (
     <>
@@ -215,7 +254,11 @@ const Games: React.FC = () => {
         >
           {bannerList?.map((item, index) => (
             <SwiperSlide key={index}>
-              <a href={item.link} target="_blank" rel="noreferrer">
+              <a
+                href={item.link.startsWith("http") ? item.link : setting.main_web_host}
+                target="_blank"
+                rel="noreferrer"
+              >
                 <img
                   src={item ? item.image : "/images/title-circle.webp"}
                   alt={`banner-${index}`}
@@ -245,14 +288,7 @@ const Games: React.FC = () => {
                   ))}
                   {/* 搜尋圖示按鈕 */}
                   <li className="ml-auto w-10 h-10 bg-black rounded-full text-white text-center flex items-center justify-center">
-                    <SearchIcon
-                      onClick={() => {
-                        setSearching(true);
-                        setSearchText("");
-                        setCommittedText("");
-                      }}
-                      className="cursor-pointer"
-                    />
+                    <SearchIcon onClick={enterSearchMode} className="cursor-pointer" />
                   </li>
                 </>
               ) : (
@@ -267,20 +303,7 @@ const Games: React.FC = () => {
                     onKeyDown={handleKeyDown}
                     placeholder={t("games.search_placeholder")}
                   />
-                  <SearchIcon
-                    onClick={() => {
-                      setSearching(true);
-                      setSearchText("");
-                      setCommittedText(""); // 清除舊的
-                      setPage(1);
-                      setHasInitLoaded(false);
-                      dispatch(RESET_GAMES_STATE());
-                      loadGameList(1, false).then(() => {
-                        setHasInitLoaded(true);
-                      });
-                    }}
-                    className="cursor-pointer"
-                  />
+                  <SearchIcon onClick={handleSearchSubmit} className="cursor-pointer" />
                 </>
               )}
             </ul>
@@ -325,7 +348,7 @@ const Games: React.FC = () => {
       )}
 
       {/* 無限滾動觸發點 */}
-      {hasMore && <div ref={loadMoreRef} className="h-10"></div>}
+      {paginationMode !== "click" && hasMore && <div ref={loadMoreRef} className="h-10"></div>}
 
       {!isLoading && (
         <>
@@ -333,6 +356,10 @@ const Games: React.FC = () => {
             //  沒資料時顯示這個
             <div className="w-full h-10 flex justify-center items-center mb-20">
               <p className="text-gray-500 dark:text-white">{t("games.no_data_found")}</p>
+            </div>
+          ) : paginationMode === "click" ? (
+            <div className="dark:bg-bk">
+              <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={pageLoading} />
             </div>
           ) : (
             !hasMore && (

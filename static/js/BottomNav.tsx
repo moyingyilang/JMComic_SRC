@@ -1,19 +1,16 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import BottomAds from "../Ads/BottomAds";
-import HomeIcon from "@mui/icons-material/Home";
-import WindowIcon from "@mui/icons-material/Window";
-import VideogameAssetIcon from "@mui/icons-material/VideogameAsset";
-import VideocamIcon from "@mui/icons-material/Videocam";
-import TextsmsIcon from "@mui/icons-material/Textsms";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import HomeIcon from "@mui/icons-material/Home";
+import TextsmsIcon from "@mui/icons-material/Textsms";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import VideogameAssetIcon from "@mui/icons-material/VideogameAsset";
+import WindowIcon from "@mui/icons-material/Window";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import AdComponent from "../../components/Ads/AdComponent";
+import { Link } from "react-router-dom";
 import { FETCH_NOTIFICATIONS_UNREAD_THUNK } from "../../actions/memberAction";
+import AdComponent from "../../components/Ads/AdComponent";
 import { useGlobalConfig } from "../../GlobalContext";
-import { useAdResizeWatcher } from "../../Hooks";
-import { getRandomItems } from "../../utils/Function";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 const BottomNav = (props: any) => {
   const { currentPage } = props;
@@ -68,14 +65,17 @@ const BottomNav = (props: any) => {
       {currentPage !== "forum" && (
         <div
           ref={containerRef}
-          className={`fixed left-0 right-0 transition-all duration-300 ease-in-out ${
-            adResize ? "bottom-[3rem]" : "bottom-[4.5em]"
+          className={`fixed left-0 right-0 flex justify-center z-20 transition-all duration-300 ease-in-out ${
+            adResize ? "bottom-[7rem]" : "bottom-[6rem]"
           }`}
         >
           {currentAdKey && <AdComponent adKey={currentAdKey} closeBtn={true} handleAdResize={handleAdResize} />}
         </div>
       )}
-      <div className="fixed bottom-0 left-0 right-0 w-full z-20">
+      <div
+        className="fixed bottom-0 left-0 right-0 w-full z-30"
+        style={{ willChange: "transform", transform: "translateZ(0)" }}
+      >
         <div className="flex justify-around items-start bg-bbk text-gy z-50 min-h-[6rem] pt-3 overflow-hidden">
           {items.map((item, i) => (
             <Link

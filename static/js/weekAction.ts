@@ -1,6 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import HttpUtil from "../api/HttpUtil";
 import { getApiEndpoint } from "../api/ApiEndpointUtil";
+import HttpUtil from "../api/HttpUtil";
 
 
 export const FETCH_WEEK_THUNK = createAsyncThunk(
@@ -16,6 +16,7 @@ export const FETCH_WEEK_THUNK = createAsyncThunk(
                     if (response.code === 200) {
                         res = response;
                     }
+
                 },
                 (error: any) => {
                     return new Error(error);
@@ -30,7 +31,7 @@ export const FETCH_WEEK_THUNK = createAsyncThunk(
 
 export const FETCH_WEEK_FILTER_THUNK = createAsyncThunk(
     "weekFilter/fetch",
-    async (params: { id: string; type: string; }, { rejectWithValue }) => {
+    async (params: { id: string; type: string; page?: number; }, { rejectWithValue }) => {
         try {
             let res: Record<string, any> = {};
 

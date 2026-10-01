@@ -1,6 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import HttpUtil from "../api/HttpUtil";
 import { getApiEndpoint } from "../api/ApiEndpointUtil";
+import HttpUtil from "../api/HttpUtil";
 
 
 export const FETCH_DETAIL_THUNK = createAsyncThunk(
@@ -60,13 +60,13 @@ export const FETCH_ALBUM_DOWNLOAD_THUNK = createAsyncThunk(
 
 export const FETCH_COMIC_READ_THUNK = createAsyncThunk(
     "comicRead/fetch",
-    async (id: string, { rejectWithValue }) => {
+    async (params: { id: string; express?: string; }, { rejectWithValue }) => {
         try {
             let res: Record<string, any> = {};
 
             const url = getApiEndpoint("API_COMIC_READ");
 
-            await HttpUtil.fetchGet(url, { id },
+            await HttpUtil.fetchGet(url, params,
                 (response: any) => {
                     if (response.code === 200) {
                         res = response.data;

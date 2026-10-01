@@ -1,13 +1,12 @@
 // src/lib/ota-updater.ts
-import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Capacitor, WebView } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Preferences } from '@capacitor/preferences';
-import { App } from '@capacitor/app';
-import JSZip from 'jszip';
-import { WebView, Capacitor } from '@capacitor/core';
 import CryptoJS from 'crypto-js';
-import { RootState, AppDispatch } from '../store';
-import { SET_HOT_UPDATE_ENABLED, SET_HOT_UPDATE_MODAL_PROGRESS, SET_NEW_VERSION, SET_SHOW_HOT_UPDATE_MODAL } from '../reducers/hotUpdateReducer';
+import JSZip from 'jszip';
 import GlobalStore from "../config/GlobalStore";
+import { SET_HOT_UPDATE_ENABLED, SET_HOT_UPDATE_MODAL_PROGRESS, SET_NEW_VERSION, SET_SHOW_HOT_UPDATE_MODAL } from '../reducers/hotUpdateReducer';
+import { AppDispatch, RootState } from '../store';
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                          */
@@ -28,18 +27,48 @@ function waitForApiUrl(): Promise<void> {
     });
 }
 
+export const DEFAULT_VERSION = process.env.REACT_APP_VERSION || "2.0.0";
+
 export async function fetchRemoteVersion(): Promise<string> {
     // await waitForApiUrl();
-    const VERSION_URL = `${GlobalStore.apiUrl}static/jmapp3apk/version.json`;
-    const res = await fetch(VERSION_URL);
+    // 避免 WebView／CDN／電信商代理快取住舊的 version.json，導致判斷成需要更新到過期版本
+    const VERSION_URL = `${GlobalStore.apiUrl}static/jmapp3apk/version.json?t=${Date.now()}`;
+    const res = await fetch(VERSION_URL, { cache: 'no-store' });
     const data = await res.json();
-    return data.version ?? DEFAULT_VERSION;
+    const remote = data.version ?? DEFAULT_VERSION;
+
+    // 防呆：多鏡像網域架構下，若這次隨機打到的鏡像 version.json 還沒同步更新，
+    // 拿到的版本號可能比 APK 本身內建的版本還舊（不合理），視為無效結果、忽略之。
+    if (isNewerVersion(DEFAULT_VERSION, remote)) {
+        console.warn(`[OTA] 遠端版本 ${remote} 比內建版本 ${DEFAULT_VERSION} 還舊，判定為未同步的過期鏡像，忽略`);
+        return DEFAULT_VERSION;
+    }
+
+    return remote;
 }
 
-export const DEFAULT_VERSION = process.env.REACT_APP_VERSION || "2.0.0";
 export async function getLocalVersion(): Promise<string> {
-    const { value } = await Preferences.get({ key: LOCAL_VERSION_KEY });
-    return value ?? DEFAULT_VERSION;
+    let { value } = await Preferences.get({ key: LOCAL_VERSION_KEY });
+
+    // 防呆：reload 後 Capacitor native bridge 可能還沒就緒，Preferences 讀取偶爾會撲空，
+    // 稍等一次再重讀，避免把「暫時讀不到」誤判成「本來就沒有」而回退成過舊的 DEFAULT_VERSION。
+    if (!value) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        value = (await Preferences.get({ key: LOCAL_VERSION_KEY })).value;
+    }
+
+    const stored = value ?? DEFAULT_VERSION;
+
+    // 保底：持久化的版本號不該低於 APK 本身內建的版本。
+    // 某些裝置（尤其 Samsung）在全新安裝時會透過系統備份還原機制，把舊裝置/舊安裝的
+    // Preferences（含 buildVersion）寫回新安裝的 App，導致本地版本號誤判為舊版，
+    // 進而一直觸發熱更新提示。這裡以 DEFAULT_VERSION 為下限自我修正。
+    if (isNewerVersion(DEFAULT_VERSION, stored)) {
+        await setLocalVersion(DEFAULT_VERSION);
+        return DEFAULT_VERSION;
+    }
+
+    return stored;
 }
 
 export async function setLocalVersion(v: string) {

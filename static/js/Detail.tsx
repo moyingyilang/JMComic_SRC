@@ -1,31 +1,30 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useGlobalConfig } from "../../GlobalContext";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { useTranslation } from "react-i18next";
-import { motion } from "framer-motion";
 import ShareIcon from "@mui/icons-material/Share";
-import Desc from "../../components/Comic/Desc";
-import Series from "../../components/Comic/Series";
-import Comment from "../../components/Comic/Comment";
-import Share from "../../components/Comic/Share";
-import Loading from "../../components/Common/Loading";
-import MemberModal from "../../components/Modal/MemberModal";
-import DialogModal from "../../components/Modal/DialogModal";
-import { FETCH_DETAIL_THUNK } from "../../actions/detailAction";
-import { FETCH_NOTIFICATIONS_SERTRACK_THUNK } from "../../actions/memberAction";
-import { defaultEditInitialState, defaultUserFormData } from "../../utils/InterFace";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useGlobalConfig } from "../../GlobalContext";
 import { GoBack, useScrollToTop } from "../../Hooks";
+import { FETCH_DETAIL_THUNK } from "../../actions/detailAction";
 import { FETCH_COIN_BUY_THUNK } from "../../actions/mainAction";
 import AdComponent from "../../components/Ads/AdComponent";
 import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import Comment from "../../components/Comic/Comment";
+import Desc from "../../components/Comic/Desc";
+import Series from "../../components/Comic/Series";
+import Share from "../../components/Comic/Share";
+import HeaderAds from "../../components/Common/HeaderAds";
+import Loading from "../../components/Common/Loading";
 import TopBtn from "../../components/Common/TopBtn";
-import { CLEAR_FORUM_LIST } from "../../reducers/forumReducer";
-import { CLEAR_DETIAL_LIST, RESET_DETAIL_STATE } from "../../reducers/detailReducer";
+import DialogModal from "../../components/Modal/DialogModal";
+import MemberModal from "../../components/Modal/MemberModal";
+import { RESET_DETAIL_STATE } from "../../reducers/detailReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { defaultEditInitialState, defaultUserFormData } from "../../utils/InterFace";
 
 const Detail = () => {
   const { config, setConfig } = useGlobalConfig();
-  const { setting, logined, darkMode } = config;
+  const { setting, logined, darkMode, memberInfo, adsContent } = config;
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
@@ -42,6 +41,7 @@ const Detail = () => {
   const [share, setShare] = useState(false);
   const dispatch = useAppDispatch();
   const { detailList, isLoading } = useAppSelector((state) => state.detail);
+  const hasData = detailList && Object.keys(detailList).length > 0 && String(detailList.id) === String(queryId);
 
   const [goBack, setGoBack] = useState<string | number>("");
   const [clearFinish, setClearFinish] = useState(false);
@@ -71,6 +71,18 @@ const Detail = () => {
     currentChapterId: "",
   });
 
+  const closeExpress = () => {
+    if (config.express === "on") {
+      sessionStorage.setItem("imageSource", "1");
+
+      setConfig((prev) => ({ ...prev, express: "", app_img_shunt: "1" }));
+    }
+  };
+
+  useEffect(() => {
+    closeExpress();
+  }, [config.express]);
+
   useEffect(() => {
     if (queryId && readId) {
       handlerReadEpisodeStorage();
@@ -84,39 +96,44 @@ const Detail = () => {
 
   useEffect(() => {
     scrollToTop();
-    if (queryId && detailList && Object.keys(detailList)?.length === 0) {
+    if (queryId && !hasData) {
       dispatch(FETCH_DETAIL_THUNK(queryId));
       setClearFinish(true);
     }
-  }, [queryId, detailList, logined, dispatch]);
+  }, [queryId, hasData, logined, dispatch, scrollToTop]);
 
   useEffect(() => {
+    if (!queryId || !clearFinish || !detailList?.series?.length) return;
+
     const chunkSize = 10;
-    if (queryId && clearFinish && detailList?.series?.length > 0) {
-      const { series } = detailList;
-      const chunkedSeries = [];
-      for (let i = 0; i < series.length; i += chunkSize) {
-        chunkedSeries.push(series.slice(i, i + chunkSize));
-      }
-      const currentIndex = series.findIndex((item: any) => item.id === queryId);
-      const chunkItem = series[currentIndex];
+    const { series } = detailList;
 
-      const storageKey = "readEp";
-      const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
-      const index = existing.findIndex((item: any) => item.id === queryId);
+    // chunk
+    const chunkedSeries = Array.from({ length: Math.ceil(series.length / chunkSize) }, (_, i) =>
+      series.slice(i * chunkSize, i * chunkSize + chunkSize)
+    );
 
-      const chunkIndex = chunkedSeries
-        .reverse()
-        .findIndex((chunk: any) => chunk.some((item: any) => item.id === queryId));
+    // current item
+    const currentIndex = series.findIndex((item: any) => item.id === queryId);
+    const currentItem = series[currentIndex] || series[0];
 
-      setSeriesGroups({
-        ...seriesGroups,
-        menus: chunkedSeries,
-        episode: Number(existing[index]?.episode) || chunkIndex || 0,
-        subEpisode: existing[index]?.subEpisode || chunkItem?.sort || series[0]?.sort || "",
-        currentChapterId: existing[index]?.readId || chunkItem?.id || series[0]?.id || String(detailList.id),
-      });
-    }
+    // localStorage
+    const storageKey = "readEp";
+    const existing = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    const storedItem = existing.find((item: any) => item.id === queryId);
+
+    // chunk index
+    const chunkIndex = [...chunkedSeries]
+      .reverse()
+      .findIndex((chunk) => chunk.some((item: any) => item.id === queryId));
+
+    setSeriesGroups((prev: any) => ({
+      ...prev,
+      menus: chunkedSeries,
+      episode: Number(storedItem?.episode) || chunkIndex || 0,
+      subEpisode: storedItem?.subEpisode || currentItem?.sort || series[0]?.sort || "",
+      currentChapterId: storedItem?.readId || currentItem?.id || series[0]?.id || String(detailList.id),
+    }));
   }, [queryId, clearFinish, detailList?.series]);
 
   // read history localStorage
@@ -202,7 +219,7 @@ const Detail = () => {
   const filterSerch = sessionStorage.getItem("searchQuery") || "";
 
   useEffect(() => {
-    const gobackSearch = `/search?filter=${filterSerch}`;
+    const gobackSearch = `/search?filter=${encodeURIComponent(filterSerch)}`;
     const gobackDetail = `/comic/detail?id=${relatedQuery}`;
 
     if (relatedQuery) {
@@ -219,15 +236,18 @@ const Detail = () => {
 
   return (
     <>
-      <div className="dark:text-tgy min-h-screen">
-        {isLoading && <Loading />}
-        <div className="relative w-full h-20 text-white flex justify-between items-center px-3 py-2 z-20">
+      <div className="h-full dark:text-tgy dark:bg-bk">
+        {isLoading && !hasData && <Loading />}
+        <div className="sticky top-safe z-50">
+          <HeaderAds />
+        </div>
+        <div className="relative w-full h-14 text-white flex justify-between items-center px-3 py-2 z-20">
           <GoBack back={goBack} />
           <ShareIcon sx={{ fontSize: 26, stroke: "white", strokeWidth: 1 }} onClick={() => setShare(true)} />
         </div>
         <div className="bg-tgy transform translate-y-[-70px] relative overflow-hidden z-10">
           <div className="relative">
-            {!isLoading ? (
+            {hasData || !isLoading ? (
               <img
                 src={setting.img_host + "/media/albums/" + detailList.id + "_3x4.jpg?v=" + detailList.addtime}
                 alt={detailList.id}
@@ -308,6 +328,8 @@ const Detail = () => {
               queryId={queryId}
               setting={setting}
               logined={logined}
+              memberInfo={memberInfo}
+              adsContent={adsContent}
               detailList={detailList}
               setTab={setTab}
               setMsgOpen={setMsgOpen}
@@ -343,6 +365,7 @@ const Detail = () => {
               handlerReadStorage={handlerReadStorage}
               readHistory={readHistory}
               setDialogOpen={setDialogOpen}
+              closeExpress={closeExpress}
             />
           )}
         </motion.div>
@@ -361,10 +384,10 @@ const Detail = () => {
           {tab === 3 && (
             <Comment
               t={t}
-              setConfig={setConfig}
               centerTopicInput={true}
               queryId={queryId}
               setting={setting}
+              memberInfo={memberInfo}
               logined={logined}
               dialogOpen={dialogOpen}
               setDialogOpen={setDialogOpen}

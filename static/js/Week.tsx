@@ -1,20 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { useGlobalConfig } from "../../GlobalContext";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import Button from "@mui/material/Button";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import { motion } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
+import { FETCH_WEEK_FILTER_THUNK, FETCH_WEEK_THUNK } from "../../actions/weekAction";
+import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
+import ClickPagination from "../../components/Common/ClickPagination";
+import ComicList from "../../components/Common/ComicList";
+import HeaderAds from "../../components/Common/HeaderAds";
 import Loading from "../../components/Common/Loading";
 import TopBtn from "../../components/Common/TopBtn";
-import ComicList from "../../components/Common/ComicList";
-import { FETCH_WEEK_THUNK, FETCH_WEEK_FILTER_THUNK } from "../../actions/weekAction";
-import { GoBack } from "../../Hooks";
+import { useGlobalConfig } from "../../GlobalContext";
+import { GoBack, useScrollToTop } from "../../Hooks";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { defaultEditInitialState } from "../../utils/InterFace";
-import { motion } from "framer-motion";
-import PositionedSnackbar, { useSnackbarState } from "../../components/Alert/PositionedSnackbar";
 
 const Week = () => {
   const { config } = useGlobalConfig();
@@ -22,6 +24,7 @@ const Week = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const scrollToTop = useScrollToTop();
   const { snackbars, setSnackbars, showSnackbar } = useSnackbarState();
   const { weekList, weekFilterList, isLoading } = useAppSelector((state) => state.week);
   const { editResult } = useAppSelector((state) => state.member);
@@ -30,6 +33,29 @@ const Week = () => {
   const [editFolder, setEditFolder] = useState(defaultEditInitialState);
   // sessionStorage.setItem("fromPage", location.pathname);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [page, setPage] = useState(() => Number(sessionStorage.getItem("weekLoadMore")) || 1);
+  const hasLoadedOnce = useRef(false);
+  const WEEK_PAGE_SIZE = 20;
+  const pageLimit = weekFilterList.total ? Math.ceil(weekFilterList.total / WEEK_PAGE_SIZE) : 1;
+
+  const updatePage = (value: number) => {
+    setPage(value);
+    sessionStorage.setItem("weekLoadMore", String(value));
+  };
+
+  const goToPage = (value: number) => {
+    const targetPage = Math.min(Math.max(value, 1), pageLimit);
+    if (targetPage === page) return;
+    updatePage(targetPage);
+    scrollToTop();
+    dispatch(
+      FETCH_WEEK_FILTER_THUNK({
+        id: selected.categoriesId,
+        type: selected.selectType,
+        page: targetPage,
+      })
+    );
+  };
 
   // 預設日漫'manga' || 其他'another' || 韓漫'hanman'
   useEffect(() => {
@@ -45,13 +71,18 @@ const Week = () => {
 
   useEffect(() => {
     if (selected.categoriesId && selected.selectType) {
+      const initialPage = hasLoadedOnce.current ? 1 : page;
+      hasLoadedOnce.current = true;
+      updatePage(initialPage);
       dispatch(
         FETCH_WEEK_FILTER_THUNK({
           id: selected.categoriesId,
           type: selected.selectType,
+          page: initialPage,
         })
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, dispatch]);
 
   useEffect(() => {
@@ -68,10 +99,11 @@ const Week = () => {
   }, [weekList]);
 
   return (
-    <div className="h-full">
+    <div className="h-full dark:bg-bk">
       {isLoading && <Loading />}
       <div className="sticky top-safe z-50">
-        <div className="sticky top-0 h-20 bg-bbk text-white flex items-end p-2 py-3">
+        <HeaderAds />
+        <div className="h-14 bg-bbk text-white flex items-end p-2 py-3">
           <GoBack back={sessionStorage.getItem("fromPage") || "/"} />
           <p className="ml-4 text-2xl text-og">{t("comic.must_watch")}</p>
           <span className="ml-5">{t("comic.update_time")}</span>
@@ -163,6 +195,12 @@ const Week = () => {
         showSnackbar={showSnackbar}
         dialogOpen={dialogOpen}
       />
+      {!isLoading &&
+        (weekFilterList.list?.length > 0 ? (
+          <ClickPagination pageLimit={pageLimit} page={page} onChange={goToPage} loading={isLoading} />
+        ) : (
+          <p className="text-center mt-10 mb-20">{t("comic.no_more")}</p>
+        ))}
       <TopBtn />
       <PositionedSnackbar snackbars={snackbars} setSnackbars={setSnackbars} />
     </div>

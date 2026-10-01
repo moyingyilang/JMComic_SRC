@@ -1,18 +1,16 @@
-import { useEffect, useRef, useState } from "react";
 import { CircularProgress } from "@mui/material";
-import { fetchRemoteVersion, getLocalVersion, runOtaFlow } from "../../utils/hotModule";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { RootState } from "../../store";
-import { useSelector } from "react-redux";
+import Box from "@mui/material/Box";
 import LinearProgress, { LinearProgressProps } from "@mui/material/LinearProgress";
 import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-import GlobalStore from "../../config/GlobalStore";
+import { useEffect, useState } from "react";
+import { RootState } from "../../store";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { runOtaFlow } from "../../utils/hotModule";
 
 const VersionUpdate = (props: any) => {
   const { config, visible } = props;
   const [loading, setLoading] = useState(true);
-  const { jm3_version_info, jm3_download_url, app_landing_page } = config.setting;
+  const { jm3_version_info, jm3_download_url, app_landing_page, main_web_host } = config.setting;
   const version = localStorage.getItem("newVersion") || "";
   const dispatch = useAppDispatch();
   const { hotUpdateModalProgress, newVersion } = useAppSelector((state) => state.hotUpdate);
@@ -87,11 +85,11 @@ const VersionUpdate = (props: any) => {
                   <Box sx={{ width: "100%" }}>
                     <LinearProgressWithLabel value={hotUpdateModalProgress} />
                   </Box>
-                  <p className="my-2">無法更新？請點選下方 spk 載點</p>
-                  <a href={GlobalStore.apiUrl + jm3_download_url}>
+                  <p className="my-2">無法更新？請點選下方 apk 載點</p>
+                  <a href={jm3_download_url.startsWith("http") ? jm3_download_url : main_web_host}>
                     <button className="w-full bg-og p-2 shadow-lg rounded shadow-stone-700/50 mb-3">下載點1</button>
                   </a>
-                  <a href={app_landing_page}>
+                  <a href={app_landing_page.startsWith("http") ? app_landing_page : main_web_host}>
                     <button className="w-full bg-og p-2 shadow-lg rounded shadow-stone-700/50">下載點2</button>
                   </a>
                 </div>

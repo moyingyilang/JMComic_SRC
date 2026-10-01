@@ -1,18 +1,20 @@
 import { combineReducers } from "redux";
-import settingsReducer from "../reducers/settingsReducer";
-import mainReducer from "../reducers/mainReducer";
+import blogsReducer from "../reducers/blogsReducer";
+import categoriesReducer from "../reducers/categoriesReducer";
+import contactReducer from "../reducers/contactReducer";
+import creatorReducer from "../reducers/creatorReducer";
 import detailReducer from "../reducers/detailReducer";
 import forumReducer from "../reducers/forumReducer";
-import searchReducer from "../reducers/searchReducer";
-import weekReducer from "../reducers/weekReducer";
-import blogsReducer from "../reducers/blogsReducer";
-import creatorReducer from "../reducers/creatorReducer";
-import categoriesReducer from "../reducers/categoriesReducer";
-import memberReducer from "../reducers/memberReducer";
 import gamesReducer from "../reducers/gamesReducer";
-import moviesReducer from "../reducers/moviesReducer";
-import moviesPlayerReducer from "../reducers/moviesPlayerReducer";
 import hotUpdateReducer from "../reducers/hotUpdateReducer";
+import mainReducer from "../reducers/mainReducer";
+import memberReducer from "../reducers/memberReducer";
+import moviesPlayerReducer from "../reducers/moviesPlayerReducer";
+import moviesReducer from "../reducers/moviesReducer";
+import novelReducer from "../reducers/novelReducer";
+import searchReducer from "../reducers/searchReducer";
+import settingsReducer from "../reducers/settingsReducer";
+import weekReducer from "../reducers/weekReducer";
 
 
 const rootReducer = combineReducers({
@@ -30,6 +32,8 @@ const rootReducer = combineReducers({
   games: gamesReducer,
   movies: moviesReducer,
   MoviesPlayer: moviesPlayerReducer,
+  novel: novelReducer,
+  contact: contactReducer,
 });
 
 export default rootReducer;

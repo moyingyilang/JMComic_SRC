@@ -1,25 +1,23 @@
+import BookmarkIcon from "@mui/icons-material/Bookmark";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import CheckIcon from "@mui/icons-material/Check";
+import FavoriteIcon from "@mui/icons-material/Favorite";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import FavoriteIcon from "@mui/icons-material/Favorite";
-import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
-import BookmarkIcon from "@mui/icons-material/Bookmark";
-import CheckIcon from "@mui/icons-material/Check";
 import {
-  FETCH_ADD_LIKE_THUNK,
   FETCH_ADD_FAVORITE_THUNK,
+  FETCH_ADD_LIKE_THUNK,
   FETCH_EDIT_FAVORITE_FOLDER_THUNK,
   FETCH_FAVORITE_LIST_THUNK,
-  FETCH_WATCH_LIST_THUNK,
   FETCH_GET_WATCH_LIST_THUNK,
+  FETCH_WATCH_LIST_THUNK,
 } from "../../actions/memberAction";
-import { CLEAR_MEMBER_LIST } from "../../reducers/memberReducer";
-import { Alert } from "../Alert/Alert";
 import FolderModal from "../../components/Modal/FolderModal";
-import { defaultEditInitialState } from "../../utils/InterFace";
+import { CLEAR_MEMBER_LIST } from "../../reducers/memberReducer";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { getDateDiffFromNow } from "../../utils/Function";
-import { useEngagementActions } from "../../Hooks/useEngagementActions";
-import Loading from "./Loading";
+import { defaultEditInitialState } from "../../utils/InterFace";
+import { Alert } from "../Alert/Alert";
 
 const ComicList = (props: any) => {
   const {
@@ -29,7 +27,7 @@ const ComicList = (props: any) => {
     list,
     title,
     link,
-    smImgSize,
+    imgSize,
     setting,
     cols,
     comicTags,
@@ -42,6 +40,7 @@ const ComicList = (props: any) => {
     setDialogOpen,
     dialogOpen,
     isWeekly,
+    defaultCoverImg,
   } = props;
 
   const dispatch = useAppDispatch();
@@ -50,13 +49,19 @@ const ComicList = (props: any) => {
   const movedRef = useRef(false);
   const isLikedItem = JSON.parse(localStorage.getItem("likedItems") || "[]");
   const [markLoading, setMarkLoading] = useState(false);
-  const [favoriteSave, setFavoriteSave] = useState<{ like: string[]; mark: string[] }>(() => {
-    const storedLikes = localStorage.getItem("likedItems");
-    return {
-      like: storedLikes ? JSON.parse(storedLikes) : [],
-      mark: [],
-    };
-  });
+  const [addedMarks, setAddedMarks] = useState<Set<string>>(
+    () => new Set(JSON.parse(localStorage.getItem("addedMarks") || "[]"))
+  );
+  const [removedMarks, setRemovedMarks] = useState<Set<string>>(
+    () => new Set(JSON.parse(localStorage.getItem("removedMarks") || "[]"))
+  );
+
+  const sizeMap = {
+    sm: { w: 130, h: 150, class: "w-[130px] h-[150px]" },
+    md: { w: 128, h: 171, class: "w-[128px] h-[171px]" },
+  } as const;
+
+  const currentSize = sizeMap[(imgSize as keyof typeof sizeMap) || "md"];
 
   // 漫畫長按刪除
   const handleOpenDelWatchComicAlert = (aid: string) => {
@@ -97,16 +102,34 @@ const ComicList = (props: any) => {
     clearTimeout(timerRef.current!);
   };
 
-  // like && mark
-  const toggleFavoriteState = (type: "like" | "mark", id: string) => {
-    setFavoriteSave((prev: any) => {
-      const currentList = prev[type] || [];
-      const exists = currentList.includes(id);
-
-      const updatedList = exists ? currentList.filter((item: string) => item !== id) : [...currentList, id];
-
-      return { ...prev, [type]: updatedList };
-    });
+  const updateMarkState = (id: string, action: "add" | "remove") => {
+    if (action === "add") {
+      setAddedMarks((prev) => {
+        const s = new Set(prev);
+        s.add(id);
+        localStorage.setItem("addedMarks", JSON.stringify([...s]));
+        return s;
+      });
+      setRemovedMarks((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        localStorage.setItem("removedMarks", JSON.stringify([...s]));
+        return s;
+      });
+    } else {
+      setRemovedMarks((prev) => {
+        const s = new Set(prev);
+        s.add(id);
+        localStorage.setItem("removedMarks", JSON.stringify([...s]));
+        return s;
+      });
+      setAddedMarks((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        localStorage.setItem("addedMarks", JSON.stringify([...s]));
+        return s;
+      });
+    }
   };
 
   const handleEngagementAction = async (type: string, id: string) => {
@@ -130,7 +153,6 @@ const ComicList = (props: any) => {
       } else {
         setMarkLoading(true);
         handleFindFolder();
-        toggleFavoriteState("mark", id);
         const result = await dispatch(FETCH_ADD_FAVORITE_THUNK(id)).unwrap();
         const { code, data } = result;
         const msgType = data.status !== "ok" ? "error" : "success";
@@ -139,10 +161,12 @@ const ComicList = (props: any) => {
             case "add":
             case "edit":
             case "move":
+              updateMarkState(id, "add");
               setEditFolder((prev: any) => ({ ...prev, aid: id, alert: false }));
               setDialogOpen({ ...dialogOpen, folder: true });
               break;
             case "remove":
+              updateMarkState(id, "remove");
               setEditFolder((prev: any) => ({ ...prev, ...defaultEditInitialState }));
               break;
           }
@@ -199,7 +223,7 @@ const ComicList = (props: any) => {
           .map((row, rowIndex) => (
             <div
               key={rowIndex}
-              className="grid grid-cols-3 bg-white gap-2 my-3 p-2 relative dark:bg-nbk dark:text-tgy"
+              className="grid grid-cols-3 bg-white gap-2 my-3 p-2 relative dark:bg-nbk dark:text-white"
               style={{ paddingTop: cardPadding || "" }}
             >
               {row.map((item, index) => (
@@ -221,33 +245,30 @@ const ComicList = (props: any) => {
                     <Link to={link ? `/comic/detail?id=${item.id}` : "#"}>
                       <img
                         src={
-                          setting?.img_host &&
-                          setting.img_host + "/media/albums/" + item.id + "_3x4.jpg?v=" + item.update_at
+                          setting?.img_host && item?.id
+                            ? `${setting.img_host}/media/albums/${item.id}_3x4.jpg?v=${item.update_at || ""}`
+                            : defaultCoverImg || "/images/cover_default.jpg"
                         }
-                        alt={item.id}
+                        alt={item?.id || "cover"}
                         loading="lazy"
-                        onLoad={(e) => {
-                          // const target = e.target as HTMLImageElement;
-                          // target.style.opacity = "1";
-                        }}
+                        decoding="async"
+                        width={currentSize.w}
+                        height={currentSize.h}
                         onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = "/images/cover_default.jpg";
-                        }}
-                        className={`animation-click-item object-cover rounded-md
-                          ${smImgSize ? "h-[150px] w-[130px]" : "w-[128px] h-[171px]"} 
-                         ${
-                           editFolder.edit && editFolder.aid?.split(",").includes(item.id.toString())
-                             ? "opacity-75"
-                             : ""
-                         }
-                         `}
-                        style={
-                          {
-                            // opacity: "0",
-                            // transition: "opacity 0.5s ease-in-out",
+                          const img = e.currentTarget;
+                          if (!img.src.includes("cover_default.jpg")) {
+                            img.src = "/images/cover_default.jpg";
                           }
+                        }}
+                        className={`
+                        animation-click-item object-cover rounded-md bg-gy
+                        ${currentSize.class}
+                        ${
+                          editFolder.edit && (editFolder.aid || "").split(",").includes(item.id.toString())
+                            ? "opacity-75"
+                            : ""
                         }
+                      `}
                       />
                     </Link>
                     {editFolder.edit && comicCheck && (
@@ -284,7 +305,7 @@ const ComicList = (props: any) => {
                     )}
                     {comicTags && (
                       <div className="absolute right-2 top-2 rounded bg-og text-white px-[0.2rem]">
-                        {item.category.title}
+                        {item.category?.title}
                       </div>
                     )}
                     {comicMark && (
@@ -301,7 +322,7 @@ const ComicList = (props: any) => {
                           className="bg-[rgb(117,117,117,0.6)] absolute right-2 bottom-3 rounded p-[0.1rem]"
                           onClick={() => handleEngagementAction("mark", item.id)}
                         >
-                          {item.is_favorite || favoriteSave.mark.includes(item.id) ? (
+                          {(item.is_favorite && !removedMarks.has(item.id)) || addedMarks.has(item.id) ? (
                             <BookmarkIcon className="text-og" />
                           ) : (
                             <BookmarkBorderIcon className="text-2xl text-white" />
@@ -312,7 +333,7 @@ const ComicList = (props: any) => {
                   </div>
                   <Link to={link ? `/comic/detail?id=${item.id}` : "#"}>
                     <p className="truncate py-2">{item.name}</p>
-                    <p className="truncate text-gy text-t08">{item.author}</p>
+                    <p className="truncate text-gy text-t08 dark:text-lgy">{item.author}</p>
                   </Link>
                 </div>
               ))}
